@@ -37,3 +37,7 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# vscode
+.vscode
+front-end.code-workspace

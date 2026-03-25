@@ -9,8 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@metamask/sdk": "^0.34.0",
+    "element-plus": "^2.13.6",
     "vue": "^3.5.29",
-    "vue-router": "^5.0.3"
+    "vue-router": "^5.0.3",
+    "web3": "^4.16.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.4",
