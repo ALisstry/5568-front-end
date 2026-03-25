@@ -3,17 +3,7 @@ import { onMounted } from "vue";
 import MetaMaskLogin from "./components/MetaMaskLogin.vue";
 import Deposit from "./components/Deposit.vue";
 
-onMounted(() => {
-  const scriptId = "jinrishici-sdk";
-
-  if (document.getElementById(scriptId)) return;
-
-  const script = document.createElement("script");
-  script.id = scriptId;
-  script.src = "https://sdk.jinrishici.com/v2/browser/jinrishici.js";
-  script.charset = "utf-8";
-  document.body.appendChild(script);
-});
+onMounted(() => {});
 </script>
 <template>
   <div class="layout">
@@ -29,9 +19,7 @@ onMounted(() => {
     <main class="main">
       <div class="card"><Deposit /></div>
     </main>
-    <footer class="footer">
-      <!-- <span id="jinrishici-sentence">正在加载今日诗词....</span> -->
-    </footer>
+    <footer class="footer"></footer>
   </div>
 </template>
 
@@ -48,7 +36,6 @@ onMounted(() => {
     "aside main"
     "footer footer";
   min-height: 100vh;
-  /* gap: 16px; */
 }
 
 header {
@@ -129,5 +116,6 @@ footer {
 }
 .card:hover {
   border-color: gray;
+  /* background-color: rgb(250, 250, 250); */
 }
 </style>

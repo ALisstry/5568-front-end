@@ -38,7 +38,17 @@
         >
       </el-col>
       <el-col :span="6" style="padding-left: 12px">
-        <el-select v-model="unit" class="unit" style="width: 100%">
+        <el-select
+          v-model="unit"
+          class="unit"
+          popper-class="coin-select-popper"
+          style="
+            width: 100%;
+            --el-color-primary: black;
+            --el-border-color-hover: gray;
+            --el-text-color-regular: black;
+          "
+        >
           <el-option label="1e18" value="1e18"></el-option>
           <el-option label="1e15" value="1e15"></el-option>
           <el-option label="1e12" value="1e12"></el-option>
