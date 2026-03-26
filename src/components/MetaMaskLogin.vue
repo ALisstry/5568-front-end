@@ -124,14 +124,14 @@ export default {
 }
 
 .wallet-title {
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.2px;
   color: #ffffff;
 }
 
 .status-pill {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1;
   padding: 5px 9px;
   border-radius: 2px;
@@ -152,6 +152,7 @@ export default {
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.8) !important;
   background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(10px);
 }
 
 .login-button:hover {

@@ -49,10 +49,11 @@
             --el-text-color-regular: black;
           "
         >
-          <el-option label="1e18" value="1e18"></el-option>
-          <el-option label="1e15" value="1e15"></el-option>
-          <el-option label="1e12" value="1e12"></el-option>
-          <el-option label="1e9" value="1e9"></el-option>
+          <el-option label="Ether" value="ether"></el-option>
+          <el-option label="Finney" value="finney"></el-option>
+          <el-option label="Szabo" value="szabo"></el-option>
+          <el-option label="Gwei" value="gwei"></el-option>
+          <el-option label="Wei" value="wei"></el-option>
         </el-select>
       </el-col>
     </el-form-item>
@@ -64,14 +65,37 @@
   </el-form>
 </template>
 <script>
+import { Web3 } from "web3";
 export default {
   name: "Deposit",
   data() {
     return {
       coin: "",
-      value: 0,
-      unit: "1e18",
+      value: "0",
+      unit: "ether",
     };
+  },
+  computed: {
+    totalValue() {
+      if (!this.value || isNaN(Number(this.value))) return "0";
+      try {
+        const web3 = new Web3();
+        // 直接转 wei，处理溢出和精度问题
+        const weiValue = web3.utils.toWei(this.value, this.unit);
+        return weiValue; // wei 格式字符串
+      } catch (e) {
+        console.error("Value conversion error:", e);
+        return "0";
+      }
+    },
+  },
+  methods: {
+    async onSubmit() {
+      // 发送到链时用这个
+      const weiValue = this.totalValue;
+      console.log("Depositing:", weiValue, "wei");
+      // 调用合约...
+    },
   },
 };
 </script>
@@ -82,12 +106,12 @@ export default {
   margin-bottom: 10px;
 }
 .depostButton {
-  background-color: white;
+  background-color: transparent;
   color: black;
   border-color: rgb(200, 200, 200);
 }
 .depostButton:hover {
-  background-color: white;
+  background-color: transparent;
   border-color: black;
   color: black;
 }

@@ -2,7 +2,7 @@
 import { onMounted } from "vue";
 import MetaMaskLogin from "./components/MetaMaskLogin.vue";
 import Deposit from "./components/Deposit.vue";
-
+import CardItem from "./components/CardItem.vue";
 onMounted(() => {});
 </script>
 <template>
@@ -14,10 +14,13 @@ onMounted(() => {});
       </div>
     </header>
     <aside class="aside">
-      <div class="classify">Dashboard</div>
+      <nav style="width: 100%">
+        <RouterLink class="classify" to="/">Dashboard</RouterLink>
+        <RouterLink class="classify" to="/Interact">Dashboard</RouterLink>
+      </nav>
     </aside>
     <main class="main">
-      <div class="card"><Deposit /></div>
+      <RouterView />
     </main>
     <footer class="footer"></footer>
   </div>
@@ -81,17 +84,52 @@ aside {
   flex-direction: column;
   align-items: center;
   border-right: solid rgb(200, 200, 200) 1px;
+  position: relative;
 }
 
 .classify {
-  height: 5vh;
+  height: 60px;
   width: 100%;
-  /* background-color: gray; */
   border-bottom: solid rgb(200, 200, 200) 1px;
   display: flex;
   justify-content: center;
   align-items: center;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  transition: background-color 0.2s;
+  -webkit-user-drag: none;
 }
+
+.classify::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 60px;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+
+.classify:hover {
+  background-color: rgb(200, 200, 200);
+}
+
+.classify.router-link-active {
+  background-color: rgb(240, 240, 240);
+}
+
+.classify.router-link-active::before {
+  background-color: gray;
+}
+
+.classify:visited {
+  color: inherit;
+  text-decoration: none;
+}
+
 main {
   grid-area: main;
 }
@@ -107,15 +145,5 @@ footer {
 
 .Login-wrap {
   margin-right: 30px;
-}
-
-.card {
-  margin: 10px;
-  border: solid rgb(200, 200, 200) 1px;
-  padding: 10px;
-}
-.card:hover {
-  border-color: gray;
-  /* background-color: rgb(250, 250, 250); */
 }
 </style>
