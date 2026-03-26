@@ -1,12 +1,24 @@
-<script setup>
-import { onMounted } from "vue";
+<script>
 import MetaMaskLogin from "./components/MetaMaskLogin.vue";
-import Deposit from "./components/Deposit.vue";
-import CardItem from "./components/CardItem.vue";
-onMounted(() => {});
+export default {
+  name: "App",
+  components: {
+    MetaMaskLogin,
+  },
+  data() {
+    return {
+      isAsideCollapsed: false,
+    };
+  },
+  methods: {
+    toggleAside() {
+      this.isAsideCollapsed = !this.isAsideCollapsed;
+    },
+  },
+};
 </script>
 <template>
-  <div class="layout">
+  <div class="layout" :class="{ 'aside-collapsed': isAsideCollapsed }">
     <header class="header">
       <div class="banner">
         <h1 class="title">5568 Project</h1>
@@ -14,9 +26,24 @@ onMounted(() => {});
       </div>
     </header>
     <aside class="aside">
+      <button class="aside-toggle" @click="toggleAside">
+        {{ isAsideCollapsed ? ">" : "<" }}
+      </button>
       <nav style="width: 100%">
-        <RouterLink class="classify" to="/">Dashboard</RouterLink>
-        <RouterLink class="classify" to="/Interact">Dashboard</RouterLink>
+        <RouterLink
+          class="classify"
+          to="/"
+          :title="isAsideCollapsed ? 'Dashboard' : ''"
+        >
+          {{ isAsideCollapsed ? "DB" : "Dashboard" }}
+        </RouterLink>
+        <RouterLink
+          class="classify"
+          to="/Interact"
+          :title="isAsideCollapsed ? 'Interact' : ''"
+        >
+          {{ isAsideCollapsed ? "IN" : "Interact" }}
+        </RouterLink>
       </nav>
     </aside>
     <main class="main">
@@ -39,6 +66,11 @@ onMounted(() => {});
     "aside main"
     "footer footer";
   min-height: 100vh;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.layout.aside-collapsed {
+  grid-template-columns: 0 1fr;
 }
 
 header {
@@ -85,6 +117,36 @@ aside {
   align-items: center;
   border-right: solid rgb(200, 200, 200) 1px;
   position: relative;
+  transition: width 0.25s ease;
+  overflow: visible;
+}
+
+.aside-toggle {
+  position: absolute;
+  top: 50%;
+  right: -24px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 48px;
+  border: 1px solid rgb(200, 200, 200);
+  background: white;
+  color: rgb(90, 90, 90);
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  z-index: 20;
+}
+
+.aside-toggle:hover {
+  background: rgb(240, 240, 240);
+}
+
+.layout.aside-collapsed .aside {
+  border-right: none;
+}
+
+.layout.aside-collapsed .aside nav {
+  display: none;
 }
 
 .classify {
