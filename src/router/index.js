@@ -1,4 +1,5 @@
-import Dashboard from "@/views/dashboard.vue";
+import Dashboard from "@/views/Dashboard.vue";
+import Interact from "@/views/Interact.vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 const routes = [
@@ -10,7 +11,7 @@ const routes = [
   {
     path: "/interact",
     name: "interact",
-    component: Dashboard,
+    component: Interact,
   },
 ];
 

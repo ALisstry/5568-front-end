@@ -35,14 +35,14 @@ export default {
           to="/"
           :title="isAsideCollapsed ? 'Dashboard' : ''"
         >
-          {{ isAsideCollapsed ? "DB" : "Dashboard" }}
+          Dashboard
         </RouterLink>
         <RouterLink
           class="classify"
           to="/Interact"
           :title="isAsideCollapsed ? 'Interact' : ''"
         >
-          {{ isAsideCollapsed ? "IN" : "Interact" }}
+          Interact
         </RouterLink>
       </nav>
     </aside>
@@ -59,7 +59,7 @@ export default {
 }
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 200px 1fr;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "header header"
@@ -82,6 +82,7 @@ header {
 
   /* align-items: center; */
   background-image: url("./assets/img/a8dcb9d05c22e7e5cfb1bbd0d97092f4edd357ef.png@3840w_360h_1c.webp");
+  background-position: -45px;
   color: white;
 }
 
