@@ -216,9 +216,7 @@ main {
   grid-area: main;
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: calc(87vh - 1px); /* 计算剩余高度：100vh - header高度 - footer高度 */
-  width: 100%;
-  min-width: 0;
+  max-height: 87vh;
 }
 
 footer {

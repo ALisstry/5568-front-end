@@ -1,6 +1,5 @@
 <script>
 import CardItem from "@/components/CardItem.vue";
-import HealthFactor from "@/components/HealthFactor.vue";
 import lendingPoolAbi from "@/ABI/LendingPool.json" with { type: "json" };
 import erc20Abi from "@/ABI/AliceToken.json" with { type: "json" };
 import addressJson from "@/contracts/address.json" with { type: "json" };
@@ -22,7 +21,6 @@ export default {
   name: "Dashboard",
   components: {
     CardItem,
-    HealthFactor,
   },
   data() {
     return {
@@ -353,7 +351,7 @@ export default {
 
 <template>
   <div class="dashboard">
-    <section class="top-grid">
+    <section class="top-section">
       <CardItem class="overview-card">
         <div class="card-head">
           <h3 class="card-title">Overview</h3>
@@ -409,36 +407,40 @@ export default {
       </CardItem>
     </section>
 
-    <section class="bottom-grid">
-      <CardItem class="list-card">
-        <h3 class="card-title">Deposits</h3>
-        <p v-if="!depositRows.length" class="line">No deposited assets</p>
-        <div
-          v-for="row in depositRows"
-          :key="row.assetAddress"
-          class="asset-row"
-        >
-          <p class="line">
-            {{ row.symbol }}: {{ formatUnits(row.depositRaw, row.decimals) }}
-          </p>
-          <p class="sub-line">Value: {{ formatUnits(row.depositValueWei) }}</p>
-        </div>
-      </CardItem>
+    <section class="main-content">
+      <div class="assets-section">
+        <CardItem class="list-card">
+          <h3 class="card-title">Deposits</h3>
+          <p v-if="!depositRows.length" class="line">No deposited assets</p>
+          <div
+            v-for="row in depositRows"
+            :key="row.assetAddress"
+            class="asset-row"
+          >
+            <p class="line">
+              {{ row.symbol }}: {{ formatUnits(row.depositRaw, row.decimals) }}
+            </p>
+            <p class="sub-line">
+              Value: {{ formatUnits(row.depositValueWei) }}
+            </p>
+          </div>
+        </CardItem>
 
-      <CardItem class="list-card">
-        <h3 class="card-title">Borrows</h3>
-        <p v-if="!borrowRows.length" class="line">No borrowed assets</p>
-        <div
-          v-for="row in borrowRows"
-          :key="row.assetAddress"
-          class="asset-row"
-        >
-          <p class="line">
-            {{ row.symbol }}: {{ formatUnits(row.debtRaw, row.decimals) }}
-          </p>
-          <p class="sub-line">Value: {{ formatUnits(row.debtValueWei) }}</p>
-        </div>
-      </CardItem>
+        <CardItem class="list-card">
+          <h3 class="card-title">Borrows</h3>
+          <p v-if="!borrowRows.length" class="line">No borrowed assets</p>
+          <div
+            v-for="row in borrowRows"
+            :key="row.assetAddress"
+            class="asset-row"
+          >
+            <p class="line">
+              {{ row.symbol }}: {{ formatUnits(row.debtRaw, row.decimals) }}
+            </p>
+            <p class="sub-line">Value: {{ formatUnits(row.debtValueWei) }}</p>
+          </div>
+        </CardItem>
+      </div>
 
       <CardItem class="vault-card">
         <div class="vault-head">
@@ -477,7 +479,30 @@ export default {
         <div v-for="vault in debtVaults" :key="vault.id" class="vault-row">
           <div class="vault-header">
             <p class="vault-id">#{{ vault.id }}</p>
-            <HealthFactor :factorPercent="vault.hfPercent"></HealthFactor>
+            <span
+              class="vault-hf"
+              :style="{
+                color:
+                  vault.hfPercent < 100
+                    ? '#d9534f'
+                    : vault.hfPercent < 130
+                      ? '#f0ad4e'
+                      : '#5cb85c',
+                borderColor:
+                  vault.hfPercent < 100
+                    ? '#d9534f'
+                    : vault.hfPercent < 130
+                      ? '#f0ad4e'
+                      : '#5cb85c',
+                boxShadow:
+                  vault.hfPercent >= 100
+                    ? `0 0 8px ${vault.hfPercent < 100 ? '#d9534f' : vault.hfPercent < 130 ? '#f0ad4e' : '#5cb85c'}`
+                    : 'none',
+              }"
+              :class="`vault-hf-border-${vault.hfPercent < 100 ? 'danger' : vault.hfPercent < 130 ? 'warning' : 'safe'}`"
+            >
+              {{ Math.max(0, Math.round(vault.hfPercent)) }}%
+            </span>
           </div>
           <div class="vault-details">
             <p class="sub-line">
@@ -514,23 +539,29 @@ export default {
   gap: 20px;
 }
 
-.top-grid {
+.top-section {
   display: grid;
   grid-template-columns: minmax(320px, 1fr);
   gap: 16px;
   align-items: stretch;
 }
 
-.bottom-grid {
+.main-content {
+  margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
-  margin-top: 15px;
 }
 
-.top-grid :deep(.card-item),
-.bottom-grid :deep(.card-item) {
+.assets-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.top-section :deep(.card-item),
+.assets-section :deep(.card-item) {
   margin: 0;
   height: 100%;
 }
@@ -539,6 +570,8 @@ export default {
 .list-card,
 .vault-card {
   min-width: 0;
+  margin: 0;
+  margin-top: 20px;
 }
 
 .card-head {
@@ -631,7 +664,7 @@ export default {
 .metric-item {
   border: 1px solid rgb(235, 235, 235);
   padding: 10px;
-  background: rgb(250, 250, 250);
+  /* background: rgb(250, 250, 250); */
 }
 
 .metric-item--full {
@@ -728,11 +761,49 @@ export default {
   line-height: 1.4;
 }
 
+.vault-hf {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  position: relative;
+  border: 2px solid;
+  transition: all 0.3s ease;
+}
+
+.vault-hf::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  transition: all 0.3s ease;
+}
+
+.vault-hf-border-danger {
+  border-color: #d9534f;
+}
+
+.vault-hf-border-warning {
+  border-color: #f0ad4e;
+}
+
+.vault-hf-border-safe {
+  border-color: #5cb85c;
+  box-shadow: 0 0 8px #5cb85c;
+}
+
 .vault-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px 12px;
   margin-top: 6px;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .vault-row :deep(.hf-card) {
@@ -752,8 +823,12 @@ export default {
 }
 
 @media (max-width: 1200px) {
-  .bottom-grid {
-    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+
+  .assets-section {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -761,10 +836,6 @@ export default {
   .dashboard {
     padding: 12px;
     gap: 16px;
-  }
-
-  .bottom-grid {
-    grid-template-columns: 1fr;
   }
 
   .metrics-grid {
@@ -809,11 +880,11 @@ export default {
     gap: 12px;
   }
 
-  .top-grid {
+  .top-section {
     gap: 12px;
   }
 
-  .bottom-grid {
+  .assets-section {
     gap: 12px;
   }
 
@@ -859,6 +930,12 @@ export default {
 
   .hf-value {
     font-size: 18px;
+  }
+
+  .vault-details {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    max-width: 100%;
   }
 
   .vault-row :deep(.hf-card) {

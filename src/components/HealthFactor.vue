@@ -70,7 +70,7 @@ export default {
 
 <style scoped>
 .hf-card {
-  /* width: 220px; */
+  /* 删除:width: 220px; */
   user-select: none;
 }
 
@@ -130,3 +130,4 @@ export default {
   font-weight: 600;
 }
 </style>
+
