@@ -1,5 +1,6 @@
 import Dashboard from "@/views/Dashboard.vue";
 import Interact from "@/views/Interact.vue";
+import Test from "@/views/Test.vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 const routes = [
@@ -12,6 +13,11 @@ const routes = [
     path: "/interact",
     name: "interact",
     component: Interact,
+  },
+  {
+    path: "/test",
+    name: "test",
+    component: Test,
   },
 ];
 

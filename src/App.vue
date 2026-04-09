@@ -17,11 +17,16 @@ export default {
   },
 };
 </script>
+
 <template>
   <div class="layout" :class="{ 'aside-collapsed': isAsideCollapsed }">
     <header class="header">
       <div class="banner">
-        <h1 class="title">5568 Project</h1>
+        <!-- <h1 class="title">5568 Project</h1> -->
+        <img
+          class="title"
+          src="./assets/img/5568Project_ba-style@nulla.top.png"
+        ></img>
         <div class="Login-wrap"><MetaMaskLogin /></div>
       </div>
     </header>
@@ -43,6 +48,13 @@ export default {
           :title="isAsideCollapsed ? 'Interact' : ''"
         >
           Interact
+        </RouterLink>
+        <RouterLink
+          class="classify"
+          to="/Test"
+          :title="isAsideCollapsed ? 'Test' : ''"
+        >
+          Test
         </RouterLink>
       </nav>
     </aside>
@@ -103,6 +115,9 @@ header {
   backdrop-filter: blur(10px); */
   margin: auto auto auto 20px;
   user-select: none;
+  -webkit-user-drag: none;
+  height: 100%;
+  /* backdrop-filter: blur(20px); */
 }
 .settings {
   margin: auto 20px auto 0px;

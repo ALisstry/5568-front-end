@@ -39,7 +39,7 @@ export default {
   props: {
     factorPercent: {
       type: Number,
-      default: 100,
+      default: 130,
     },
   },
   computed: {

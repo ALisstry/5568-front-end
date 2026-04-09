@@ -23,7 +23,7 @@
 </template>
 
 <script>
-import MetaMaskSDK from "@metamask/sdk";
+import { connect } from "@/contracts/login";
 
 export default {
   name: "MetaMaskLogin",
@@ -33,68 +33,58 @@ export default {
       address: "",
       error: "",
       provider: null,
-      handleAccountsChanged: null,
+      chainId: "",
     };
-  },
-  mounted() {
-    const MMSDK = new MetaMaskSDK({
-      dappMetadata: {
-        name: "My Vue Dapp",
-        url: window.location.href,
-      },
-      // infuraAPIKey: import.meta.env.VITE_INFURA_API_KEY,
-    });
-
-    this.provider = MMSDK.getProvider() || window.ethereum || null;
-
-    this.handleAccountsChanged = (accounts) => {
-      this.address = accounts?.[0] || "";
-    };
-
-    this.provider?.on?.("accountsChanged", this.handleAccountsChanged);
-  },
-  beforeUnmount() {
-    this.provider?.removeListener?.(
-      "accountsChanged",
-      this.handleAccountsChanged,
-    );
   },
   computed: {
     shortAddress() {
       if (!this.address) return "";
-      return `${this.address.slice(0, 6)}...${this.address.slice(-4)}`;
+      return `${this.address.substring(0, 6)}...${this.address.substring(this.address.length - 4)}`;
     },
+  },
+  mounted() {
+    // 自动登录
+    this.login();
+
+    // 监听账户变化
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", (accounts) => {
+        if (accounts.length === 0) {
+          this.address = "";
+        } else {
+          this.address = accounts[0];
+        }
+      });
+
+      // 监听链变化
+      window.ethereum.on("chainChanged", (newChainId) => {
+        this.chainId = parseInt(newChainId).toString(16);
+      });
+    }
+  },
+  beforeUnmount() {
+    // 移除监听器
+    if (window.ethereum) {
+      window.ethereum.removeAllListeners("accountsChanged");
+      window.ethereum.removeAllListeners("chainChanged");
+    }
   },
   methods: {
     async login() {
-      this.error = "";
-      this.loading = true;
+      if (this.loading) {
+        return;
+      }
 
       try {
-        if (!this.provider) {
-          throw new Error(
-            "MetaMask was not detected. Please install the MetaMask browser extension, or use a mobile environment that supports deeplinks and try again.",
-          );
-        }
+        this.loading = true;
+        this.error = "";
 
-        const accounts = await this.provider.request({
-          method: "eth_requestAccounts",
-        });
-
-        this.address = accounts?.[0] || "";
-
-        if (!this.address) {
-          throw new Error(
-            "Connected successfully, but no account was returned.",
-          );
-        }
-      } catch (e) {
-        if (e?.code === 4001)
-          this.error = "You canceled the authorization request.";
-        else if (e?.code === -32002)
-          this.error =
-            "A MetaMask authorization request is already in progress. Please complete it first.";
-        else this.error = e?.message || "Connection failed.";
+        const result = await connect();
+        this.address = result.address;
+        this.chainId = result.chainId;
+      } catch (err) {
+        this.error = err.message || "Connection failed";
+        console.error("MetaMask connection error:", err);
       } finally {
         this.loading = false;
       }
