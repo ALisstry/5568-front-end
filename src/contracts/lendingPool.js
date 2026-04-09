@@ -1,16 +1,64 @@
 import addressJson from "./address.json" with { type: "json" };
 import abi from "../ABI/LendingPool.json" with { type: "json" };
 import { web3 } from "./wallet.js";
+import { approveIfNeeded, resolveAssetAddress } from "./erc20.js";
+
 const address = addressJson.LendingPool;
 const lendingPool = new web3.eth.Contract(abi, address);
+
+async function getDefaultAccount() {
+  const accounts = await web3.eth.getAccounts();
+  if (!accounts || accounts.length === 0) {
+    throw new Error("MetaMask account is not connected");
+  }
+  return accounts[0];
+}
+
+function toWeiAmount(amount, unit = "ether") {
+  const normalizedAmount = String(amount ?? "").trim();
+  if (!normalizedAmount) {
+    throw new Error("Amount is required");
+  }
+
+  let amountWei;
+  try {
+    amountWei = web3.utils.toWei(normalizedAmount, unit);
+  } catch {
+    throw new Error(`Invalid amount or unit: ${normalizedAmount} ${unit}`);
+  }
+
+  if (BigInt(amountWei) <= 0n) {
+    throw new Error("Amount must be greater than 0");
+  }
+
+  return amountWei;
+}
+
+function normalizeDebtVaultId(debtVaultId) {
+  const normalized = String(debtVaultId ?? "").trim();
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error("Invalid debtVaultId");
+  }
+  return normalized;
+}
+
+async function sendWithEstimate(method, from) {
+  let gas;
+  try {
+    gas = await method.estimateGas({ from });
+  } catch {
+    gas = undefined;
+  }
+
+  return method.send(gas ? { from, gas } : { from });
+}
+
 export const transferTest = async function () {
-  // Get user's Ethereum public address
-  const fromAddress = (await web3.eth.getAccounts())[0];
+  const fromAddress = await getDefaultAccount();
 
   const destination = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8";
-  const amount = web3.utils.toWei("0.1", "ether"); // Convert 0.0001 ether to wei
+  const amount = web3.utils.toWei("0.1", "ether");
 
-  // Submit transaction to the blockchain and wait for it to be mined
   const receipt = await web3.eth.sendTransaction({
     from: fromAddress,
     to: destination,
@@ -21,8 +69,8 @@ export const transferTest = async function () {
 
 export const getBalance = async function () {
   try {
-    const address = (await web3.eth.getAccounts())[0];
-    return web3.utils.fromWei(await web3.eth.getBalance(address), "ether");
+    const account = await getDefaultAccount();
+    return web3.utils.fromWei(await web3.eth.getBalance(account), "ether");
   } catch (err) {
     alert(err);
     throw err;
@@ -30,35 +78,120 @@ export const getBalance = async function () {
 };
 
 export async function getAccountInfo() {
-  const accounts = await web3.eth.getAccounts();
-  const defaultAccount = accounts[0];
+  const defaultAccount = await getDefaultAccount();
+  const debtVaultIds = await lendingPool.methods
+    .getOwnerDebtVaultIds(defaultAccount)
+    .call();
 
-  try {
-    const result = await lendingPool.methods
-      .getAccountInfo(defaultAccount)
-      .call();
-    alert(web3.utils.fromWei(result.collateral, "ether"));
-  } catch (err) {
-    alert(err);
-  }
+  alert(
+    debtVaultIds.length
+      ? `DebtVault IDs: ${debtVaultIds.join(", ")}`
+      : "No DebtVault found"
+  );
+
+  return debtVaultIds;
 }
 
-export async function deposit(amount, unit) {
-  const accounts = await web3.eth.getAccounts();
-  const defaultAccount = accounts[0];
-  const finalAmount = web3.utils.toWei(String(amount), unit || "ether");
+export async function getOwnerDebtVaultIds(ownerAddress) {
+  const owner = ownerAddress || (await getDefaultAccount());
+  return lendingPool.methods.getOwnerDebtVaultIds(owner).call();
+}
 
-  try {
-    const gas = await lendingPool.methods
-      .deposit(finalAmount)
-      .estimateGas({ from: defaultAccount });
-    const receipt = await lendingPool.methods.deposit(finalAmount).send({
-      from: defaultAccount,
-      gas,
-    });
-    alert("Success: " + "Transaction Hash: " + receipt.transactionHash);
-  } catch (err) {
-    alert("Failed: " + err);
-    throw err;
-  }
+export async function openDebtVault() {
+  const defaultAccount = await getDefaultAccount();
+  const predictedId = await lendingPool.methods.nextDebtVaultId().call();
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.openDebtVault(),
+    defaultAccount
+  );
+
+  return {
+    debtVaultId: String(predictedId),
+    txHash: receipt.transactionHash,
+    receipt,
+  };
+}
+
+export async function deposit({ asset, amount, unit = "ether" }) {
+  const defaultAccount = await getDefaultAccount();
+  const assetAddress = resolveAssetAddress(asset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const approveReceipt = await approveIfNeeded({
+    asset: assetAddress,
+    amountWei,
+    owner: defaultAccount,
+    spender: address,
+  });
+
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.deposit(assetAddress, amountWei),
+    defaultAccount
+  );
+
+  return {
+    txHash: receipt.transactionHash,
+    approveTxHash: approveReceipt?.transactionHash || "",
+    receipt,
+    approveReceipt,
+  };
+}
+
+export async function withdraw({ asset, amount, unit = "ether" }) {
+  const defaultAccount = await getDefaultAccount();
+  const assetAddress = resolveAssetAddress(asset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.withdraw(assetAddress, amountWei),
+    defaultAccount
+  );
+
+  return {
+    txHash: receipt.transactionHash,
+    receipt,
+  };
+}
+
+export async function borrow({ debtVaultId, asset, amount, unit = "ether" }) {
+  const defaultAccount = await getDefaultAccount();
+  const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
+  const assetAddress = resolveAssetAddress(asset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.borrow(normalizedDebtVaultId, assetAddress, amountWei),
+    defaultAccount
+  );
+
+  return {
+    txHash: receipt.transactionHash,
+    receipt,
+  };
+}
+
+export async function repay({ debtVaultId, asset, amount, unit = "ether" }) {
+  const defaultAccount = await getDefaultAccount();
+  const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
+  const assetAddress = resolveAssetAddress(asset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const approveReceipt = await approveIfNeeded({
+    asset: assetAddress,
+    amountWei,
+    owner: defaultAccount,
+    spender: address,
+  });
+
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.repay(normalizedDebtVaultId, assetAddress, amountWei),
+    defaultAccount
+  );
+
+  return {
+    txHash: receipt.transactionHash,
+    approveTxHash: approveReceipt?.transactionHash || "",
+    receipt,
+    approveReceipt,
+  };
 }

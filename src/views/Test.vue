@@ -59,7 +59,7 @@ export default {
       await getAccountInfo();
     },
     async deposit1() {
-      await deposit("1000400000000000000000");
+      await deposit({ asset: "Alice", amount: "1000", unit: "ether" });
     },
 
     async aliceApprove1() {
@@ -77,3 +77,4 @@ export default {
   },
 };
 </script>
+

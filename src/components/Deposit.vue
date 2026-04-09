@@ -1,124 +1,278 @@
 <template>
-  <h3 class="title">Deposit</h3>
-  <el-form class="deposit-form" label-position="right" label-width="auto">
-    <el-form-item label="Coin">
-      <el-select
-        v-model="coin"
-        class="selectCoin"
-        popper-class="coin-select-popper"
-        style="
-          --el-color-primary: black;
-          --el-border-color-hover: gray;
-          --el-text-color-regular: black;
-        "
-      >
-        <el-option label="Alice" value="Alice"></el-option>
-        <el-option label="Bob" value="Bob"></el-option>
-      </el-select>
-    </el-form-item>
-    <el-form-item label="Value">
-      <el-col :span="16">
-        <el-input
-          v-model="value"
-          class="value-input"
-          placeholder="Input the value to deposit"
-          clearable
-          style="
-            --el-color-primary: black;
-            --el-border-color-hover: gray;
-            --el-text-color-regular: black;
-            width: 100%;
-          "
-        ></el-input>
-      </el-col>
-      <el-col :span="2">
-        <span
-          style="width: 100%; text-align: right; display: block; color: gray"
-          >Unit</span
-        >
-      </el-col>
-      <el-col :span="6" style="padding-left: 12px">
+  <div>
+    <h3 class="title">Lending Actions</h3>
+
+    <el-form class="action-form" label-position="right" label-width="90px">
+      <el-form-item label="Action">
         <el-select
-          v-model="unit"
-          class="unit"
-          popper-class="coin-select-popper"
-          style="
-            width: 100%;
-            --el-color-primary: black;
-            --el-border-color-hover: gray;
-            --el-text-color-regular: black;
-          "
+          v-model="action"
+          class="full-width"
+          style="--el-color-primary: black; --el-border-color-hover: gray"
         >
-          <el-option label="Ether" value="ether"></el-option>
-          <el-option label="Finney" value="finney"></el-option>
-          <el-option label="Szabo" value="szabo"></el-option>
-          <el-option label="Gwei" value="gwei"></el-option>
-          <el-option label="Wei" value="wei"></el-option>
+          <el-option label="Deposit" value="deposit"></el-option>
+          <el-option label="Withdraw" value="withdraw"></el-option>
+          <el-option label="Borrow" value="borrow"></el-option>
+          <el-option label="Repay" value="repay"></el-option>
         </el-select>
-      </el-col>
-    </el-form-item>
-    <el-form-item>
-      <el-button type="primary" @click="onSubmit" class="depostButton"
-        >Deposit</el-button
-      >
-    </el-form-item>
-  </el-form>
+      </el-form-item>
+
+      <el-form-item label="Coin">
+        <el-select
+          v-model="coin"
+          class="full-width"
+          style="--el-color-primary: black; --el-border-color-hover: gray"
+        >
+          <el-option label="Alice" value="Alice"></el-option>
+          <el-option label="Bob" value="Bob"></el-option>
+        </el-select>
+      </el-form-item>
+
+      <el-form-item v-if="needsDebtVault" label="DebtVault">
+        <el-row style="width: 100%" :gutter="8">
+          <el-col :span="14">
+            <el-select
+              v-model="debtVaultId"
+              filterable
+              allow-create
+              default-first-option
+              class="full-width"
+              placeholder="Select or input DebtVault ID"
+              style="--el-color-primary: black; --el-border-color-hover: gray"
+            >
+              <el-option
+                v-for="id in debtVaultIds"
+                :key="id"
+                :label="`#${id}`"
+                :value="String(id)"
+              ></el-option>
+            </el-select>
+          </el-col>
+          <el-col :span="10" style="display: flex; gap: 8px">
+            <el-button plain class="mini-btn" @click="refreshDebtVaultIds"
+              >Refresh</el-button
+            >
+            <el-button
+              plain
+              class="mini-btn"
+              :loading="creatingVault"
+              @click="createDebtVault"
+              >Open</el-button
+            >
+          </el-col>
+        </el-row>
+      </el-form-item>
+
+      <el-form-item label="Amount">
+        <el-row style="width: 100%" :gutter="8">
+          <el-col :span="15">
+            <el-input
+              v-model="value"
+              placeholder="Input token amount"
+              clearable
+              style="--el-color-primary: black; --el-border-color-hover: gray"
+            ></el-input>
+          </el-col>
+          <el-col :span="9">
+            <el-select
+              v-model="unit"
+              class="full-width"
+              style="--el-color-primary: black; --el-border-color-hover: gray"
+            >
+              <el-option label="Ether" value="ether"></el-option>
+              <el-option label="Finney" value="finney"></el-option>
+              <el-option label="Szabo" value="szabo"></el-option>
+              <el-option label="Gwei" value="gwei"></el-option>
+              <el-option label="Wei" value="wei"></el-option>
+            </el-select>
+          </el-col>
+        </el-row>
+      </el-form-item>
+
+      <el-form-item>
+        <el-button
+          type="primary"
+          class="submit-btn"
+          :loading="submitting"
+          @click="onSubmit"
+          >{{ submitLabel }}</el-button
+        >
+      </el-form-item>
+    </el-form>
+  </div>
 </template>
+
 <script>
-import { Web3 } from "web3";
+import { ElMessage } from "element-plus";
+import {
+  borrow,
+  deposit,
+  getOwnerDebtVaultIds,
+  openDebtVault,
+  repay,
+  withdraw,
+} from "@/contracts/lendingPool";
+
 export default {
   name: "Deposit",
   data() {
     return {
-      coin: "",
-      value: "0",
+      action: "deposit",
+      coin: "Alice",
+      value: "",
       unit: "ether",
+      debtVaultId: "",
+      debtVaultIds: [],
+      submitting: false,
+      creatingVault: false,
     };
   },
   computed: {
-    totalValue() {
-      if (!this.value || isNaN(Number(this.value))) return "0";
-      try {
-        const web3 = new Web3();
-        // 直接转 wei，处理溢出和精度问题
-        const weiValue = web3.utils.toWei(this.value, this.unit);
-        return weiValue; // wei 格式字符串
-      } catch (e) {
-        console.error("Value conversion error:", e);
-        return "0";
+    needsDebtVault() {
+      return this.action === "borrow" || this.action === "repay";
+    },
+    submitLabel() {
+      if (this.action === "deposit") return "Deposit";
+      if (this.action === "withdraw") return "Withdraw";
+      if (this.action === "borrow") return "Borrow";
+      return "Repay";
+    },
+  },
+  watch: {
+    action() {
+      if (!this.needsDebtVault) {
+        this.debtVaultId = "";
+      } else if (!this.debtVaultId && this.debtVaultIds.length) {
+        this.debtVaultId = String(this.debtVaultIds[0]);
       }
     },
   },
+  async mounted() {
+    await this.refreshDebtVaultIds();
+  },
   methods: {
+    async refreshDebtVaultIds() {
+      try {
+        const ids = await getOwnerDebtVaultIds();
+        this.debtVaultIds = ids.map((id) => String(id));
+
+        if (this.needsDebtVault && !this.debtVaultId && this.debtVaultIds.length) {
+          this.debtVaultId = this.debtVaultIds[0];
+        }
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      }
+    },
+
+    async createDebtVault() {
+      this.creatingVault = true;
+      try {
+        const result = await openDebtVault();
+        await this.refreshDebtVaultIds();
+        this.debtVaultId = String(result.debtVaultId);
+        ElMessage.success(`DebtVault #${result.debtVaultId} created`);
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      } finally {
+        this.creatingVault = false;
+      }
+    },
+
+    getErrorMessage(err) {
+      return (
+        err?.cause?.message ||
+        err?.data?.message ||
+        err?.message ||
+        String(err) ||
+        "Transaction failed"
+      );
+    },
+
     async onSubmit() {
-      // 发送到链时用这个
-      const weiValue = this.totalValue;
-      console.log("Depositing:", weiValue, "wei");
-      // 调用合约...
+      if (this.submitting) {
+        return;
+      }
+
+      if (!this.value || Number(this.value) <= 0) {
+        ElMessage.warning("Amount must be greater than 0");
+        return;
+      }
+
+      if (this.needsDebtVault && !/^\d+$/.test(String(this.debtVaultId || "").trim())) {
+        ElMessage.warning("DebtVault ID is required");
+        return;
+      }
+
+      this.submitting = true;
+      try {
+        const payload = {
+          asset: this.coin,
+          amount: this.value,
+          unit: this.unit,
+        };
+
+        let result;
+        if (this.action === "deposit") {
+          result = await deposit(payload);
+        } else if (this.action === "withdraw") {
+          result = await withdraw(payload);
+        } else if (this.action === "borrow") {
+          result = await borrow({
+            ...payload,
+            debtVaultId: this.debtVaultId,
+          });
+        } else {
+          result = await repay({
+            ...payload,
+            debtVaultId: this.debtVaultId,
+          });
+        }
+
+        const tip = result.approveTxHash
+          ? `Approve: ${result.approveTxHash} | Tx: ${result.txHash}`
+          : `Tx: ${result.txHash}`;
+
+        ElMessage.success(`${this.submitLabel} success. ${tip}`);
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      } finally {
+        this.submitting = false;
+      }
     },
   },
 };
 </script>
+
 <style scoped>
 .title {
   display: inline-block;
   border-bottom: 1px solid gray;
   margin-bottom: 10px;
 }
-.depostButton {
+
+.action-form {
+  width: min(620px, 100%);
+}
+
+.full-width {
+  width: 100%;
+}
+
+.submit-btn,
+.mini-btn {
   background-color: transparent;
   color: black;
   border-color: rgb(200, 200, 200);
 }
-.depostButton:hover {
+
+.submit-btn:hover,
+.mini-btn:hover {
   background-color: transparent;
   border-color: black;
   color: black;
 }
-.depostButton:active {
+
+.submit-btn:active,
+.mini-btn:active {
   background-color: rgb(200, 200, 200);
-}
-.unit {
-  width: 100px;
 }
 </style>
