@@ -133,14 +133,19 @@
       <p class="data-value">{{ custodiedAmount }} {{ coin }}</p>
     </div>
 
-    <div v-if="action === 'borrow' && selectedVaultData" class="data-section">
-      <p class="data-label">Max Borrowable ({{ coin }})</p>
-      <p class="data-value">{{ selectedVaultData.maxBorrowable }}</p>
+    <div v-if="action === 'borrow'" class="data-section">
+      <p class="data-label">Max Borrowable</p>
+      <p class="data-value">{{ selectedVaultData?.maxBorrowable || "0" }} {{ coin }}</p>
     </div>
 
-    <div v-if="action === 'repay' && selectedVaultData" class="data-section">
+    <div v-if="action === 'repay'" class="data-section">
       <p class="data-label">Current Debt ({{ coin }})</p>
-      <p class="data-value">{{ selectedVaultData.debt }}</p>
+      <p class="data-value">{{ debtAmount }} {{ coin }}</p>
+    </div>
+
+    <div v-if="action === 'withdrawCollateral'" class="data-section">
+      <p class="data-label">Available to Withdraw</p>
+      <p class="data-value">{{ vaultCollateral }} {{ coin }}</p>
     </div>
   </CardItem>
 </template>
@@ -148,11 +153,14 @@
 <script>
 import { ElMessage } from "element-plus";
 import CardItem from "@/components/CardItem.vue";
+import lendingPoolAbi from "../ABI/LendingPool.json" with { type: "json" };
+import addressJson from "@/contracts/address.json" with { type: "json" };
 import {
   borrow,
   depositCollateral,
   getOwnerDebtVaultIds,
   getUserCustodiedShares,
+  getUserDebtBalance,
   openDebtVault,
   repay,
   withdrawCollateral,
@@ -177,6 +185,8 @@ export default {
       creatingVault: false,
       custodiedAlice: "0",
       custodiedBob: "0",
+      debtAlice: "0",
+      debtBob: "0",
       vaultDataCache: {},
     };
   },
@@ -195,6 +205,21 @@ export default {
       } catch {
         return "0";
       }
+    },
+    debtAmount() {
+      const raw =
+        this.coin === "Alice" ? this.debtAlice : this.debtBob;
+      try {
+        return web3.utils.fromWei(raw, "ether");
+      } catch {
+        return "0";
+      }
+    },
+    vaultCollateral() {
+      if (!this.selectedVaultData) return "0";
+      return this.coin === "Alice"
+        ? this.selectedVaultData.collateralAlice || "0"
+        : this.selectedVaultData.collateralBob || "0";
     },
     selectedVaultData() {
       return this.vaultDataCache[this.debtVaultId];
@@ -220,6 +245,7 @@ export default {
   async mounted() {
     await this.refreshDebtVaultIds();
     await this.refreshCustodiedShares();
+    await this.refreshDebtBalance();
   },
   methods: {
     async refreshDebtVaultIds() {
@@ -252,10 +278,61 @@ export default {
       }
     },
 
+    async refreshDebtBalance() {
+      try {
+        const aliceAddr = resolveAssetAddress("Alice");
+        const bobAddr = resolveAssetAddress("Bob");
+
+        const [aliceDebt, bobDebt] = await Promise.all([
+          getUserDebtBalance(undefined, aliceAddr),
+          getUserDebtBalance(undefined, bobAddr),
+        ]);
+
+        this.debtAlice = aliceDebt;
+        this.debtBob = bobDebt;
+      } catch (err) {
+        console.error("Failed to refresh debt balance:", err);
+      }
+    },
+
     async loadVaultData() {
-      // This is a placeholder - in real implementation,
-      // you'd fetch actual vault data from contract
-      // For now, cache is empty but structure is ready
+      if (!this.debtVaultId) return;
+
+      try {
+        const lendingPool = new web3.eth.Contract(
+          lendingPoolAbi,
+          addressJson.LendingPool
+        );
+        const aliceAddr = resolveAssetAddress("Alice");
+        const bobAddr = resolveAssetAddress("Bob");
+
+        const [summary, aliceCollateral, bobCollateral] = await Promise.all([
+          lendingPool.methods
+            .getDebtVaultSummary(this.debtVaultId)
+            .call(),
+          lendingPool.methods
+            .getDebtVaultCollateralAssetAmount(this.debtVaultId, aliceAddr)
+            .call(),
+          lendingPool.methods
+            .getDebtVaultCollateralAssetAmount(this.debtVaultId, bobAddr)
+            .call(),
+        ]);
+
+        const maxBorrowable = web3.utils.fromWei(
+          summary.maxBorrowableValue,
+          "ether"
+        );
+        const debt = web3.utils.fromWei(summary.debtValue, "ether");
+
+        this.vaultDataCache[this.debtVaultId] = {
+          maxBorrowable,
+          debt,
+          collateralAlice: web3.utils.fromWei(aliceCollateral, "ether"),
+          collateralBob: web3.utils.fromWei(bobCollateral, "ether"),
+        };
+      } catch (err) {
+        console.error("Failed to load vault data:", err);
+      }
     },
 
     async createDebtVault() {
@@ -364,6 +441,12 @@ export default {
           this.action === "withdrawCollateral"
         ) {
           await this.refreshCustodiedShares();
+        }
+        if (
+          this.action === "borrow" ||
+          this.action === "repay"
+        ) {
+          await this.refreshDebtBalance();
         }
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));

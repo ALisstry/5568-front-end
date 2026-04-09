@@ -80,6 +80,11 @@
     </el-form>
 
     <!-- Data Display Section -->
+    <div v-if="action === 'deposit'" class="data-section">
+      <p class="data-label">Balance Available</p>
+      <p class="data-value">{{ balance }} {{ coin }}</p>
+    </div>
+
     <div v-if="action === 'withdraw'" class="data-section">
       <p class="data-label">Available (Pool Custody)</p>
       <p class="data-value">{{ custodiedAmount }} {{ coin }}</p>
@@ -90,6 +95,8 @@
 <script>
 import { ElMessage } from "element-plus";
 import CardItem from "@/components/CardItem.vue";
+import erc20Abi from "../ABI/AliceToken.json" with { type: "json" };
+import addressJson from "@/contracts/address.json" with { type: "json" };
 import {
   deposit,
   getUserCustodiedShares,
@@ -112,6 +119,8 @@ export default {
       submitting: false,
       custodiedAlice: "0",
       custodiedBob: "0",
+      balanceAlice: "0",
+      balanceBob: "0",
     };
   },
   computed: {
@@ -127,6 +136,15 @@ export default {
         return "0";
       }
     },
+    balance() {
+      const raw =
+        this.coin === "Alice" ? this.balanceAlice : this.balanceBob;
+      try {
+        return web3.utils.fromWei(raw, "ether");
+      } catch {
+        return "0";
+      }
+    },
   },
   watch: {
     action() {
@@ -135,6 +153,7 @@ export default {
   },
   async mounted() {
     await this.refreshCustodiedShares();
+    await this.refreshBalance();
   },
   methods: {
     async refreshCustodiedShares() {
@@ -151,6 +170,32 @@ export default {
         this.custodiedBob = bobShares;
       } catch (err) {
         console.error("Failed to refresh custodied shares:", err);
+      }
+    },
+
+    async refreshBalance() {
+      try {
+        const accounts = await web3.eth.getAccounts();
+        if (!accounts || accounts.length === 0) return;
+
+        const aliceToken = new web3.eth.Contract(
+          erc20Abi,
+          addressJson.AliceToken
+        );
+        const bobToken = new web3.eth.Contract(
+          erc20Abi,
+          addressJson.BobToken
+        );
+
+        const [aliceBalance, bobBalance] = await Promise.all([
+          aliceToken.methods.balanceOf(accounts[0]).call(),
+          bobToken.methods.balanceOf(accounts[0]).call(),
+        ]);
+
+        this.balanceAlice = String(aliceBalance);
+        this.balanceBob = String(bobBalance);
+      } catch (err) {
+        console.error("Failed to refresh balance:", err);
       }
     },
 
@@ -226,6 +271,7 @@ export default {
         ElMessage.success(`${this.submitLabel} success. ${tip}`);
 
         await this.refreshCustodiedShares();
+        await this.refreshBalance();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
       } finally {

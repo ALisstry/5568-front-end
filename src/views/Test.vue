@@ -20,6 +20,10 @@
   <el-button @click="aliceAllowance">aliceAllowance</el-button>
   <el-divider />
   <el-button @click="withdraw_T">withdraw</el-button>
+  <el-divider />
+  <el-button @click="getBobPrice1">getBobPrice</el-button>
+  <el-divider />
+  <el-button @click="getAlicePrice1">getAlicePrice</el-button>
 </template>
 
 <script>
@@ -36,6 +40,8 @@ import {
   balanceOf as alice_balanceOf,
   allowance as alice_allowance,
 } from "@/contracts/aliceToken";
+import Web3 from "web3";
+import { getBobPrice, getAlicePrice } from "@/contracts/oracle";
 
 import CardItem from "@/components/CardItem.vue";
 export default {
@@ -85,6 +91,12 @@ export default {
       } catch (err) {
         alert("Error:" + err);
       }
+    },
+    async getBobPrice1() {
+      alert(Web3.utils.fromWei(await getBobPrice(), "ether"));
+    },
+    async getAlicePrice1() {
+      alert(Web3.utils.fromWei(await getAlicePrice(), "ether"));
     },
   },
   components: {
