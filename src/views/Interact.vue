@@ -1,15 +1,32 @@
 <script>
-import CardItem from "@/components/CardItem.vue";
 import Deposit from "@/components/Deposit.vue";
+import BorrowActions from "@/components/BorrowActions.vue";
 
 export default {
   name: "Interact",
-  components: { CardItem, Deposit },
+  components: { Deposit, BorrowActions },
 };
 </script>
 
 <template>
-  <CardItem>
+  <div class="interact-container">
     <Deposit />
-  </CardItem>
+    <BorrowActions />
+  </div>
 </template>
+
+<style scoped>
+.interact-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 20px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 960px) {
+  .interact-container {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

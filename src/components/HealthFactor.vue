@@ -70,7 +70,7 @@ export default {
 
 <style scoped>
 .hf-card {
-  width: 220px;
+  /* width: 220px; */
   user-select: none;
 }
 

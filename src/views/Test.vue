@@ -18,6 +18,8 @@
 
   <el-button @click="alicebalanceOf1">alicebalanceOf</el-button>
   <el-button @click="aliceAllowance">aliceAllowance</el-button>
+  <el-divider />
+  <el-button @click="withdraw_T">withdraw</el-button>
 </template>
 
 <script>
@@ -26,6 +28,7 @@ import {
   getBalance,
   getAccountInfo,
   deposit,
+  withdraw,
 } from "@/contracts/lendingPool";
 
 import {
@@ -71,10 +74,21 @@ export default {
     async aliceAllowance() {
       await alice_allowance();
     },
+    async withdraw_T() {
+      let result;
+      try {
+        result = await withdraw({
+          asset: "0x94099942864EA81cCF197E9D71ac53310b1468D8",
+          amount: "1",
+        });
+        alert(result);
+      } catch (err) {
+        alert("Error:" + err);
+      }
+    },
   },
   components: {
     CardItem,
   },
 };
 </script>
-

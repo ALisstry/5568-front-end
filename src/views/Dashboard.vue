@@ -1,35 +1,868 @@
-<script setup>
+<script>
 import CardItem from "@/components/CardItem.vue";
 import HealthFactor from "@/components/HealthFactor.vue";
+import lendingPoolAbi from "@/ABI/LendingPool.json" with { type: "json" };
+import erc20Abi from "@/ABI/AliceToken.json" with { type: "json" };
+import addressJson from "@/contracts/address.json" with { type: "json" };
+import { web3 } from "@/contracts/wallet";
+
+const ORACLE_ABI = [
+  {
+    inputs: [{ internalType: "address", name: "asset", type: "address" }],
+    name: "getPrice",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+];
+
+const ONE_ETHER_STR = "1000000000000000000";
+
+export default {
+  name: "Dashboard",
+  components: {
+    CardItem,
+    HealthFactor,
+  },
+  data() {
+    return {
+      loading: false,
+      error: "",
+      account: "",
+      lastUpdated: "",
+
+      healthFactorPercent: 200,
+      totalDepositValueWei: "0",
+      totalBorrowValueWei: "0",
+
+      aliceBalanceRaw: "0",
+      bobBalanceRaw: "0",
+      aliceDecimals: 18,
+      bobDecimals: 18,
+
+      depositRows: [],
+      borrowRows: [],
+      debtVaults: [],
+
+      tokenMetaByAddress: {},
+
+      onAccountsChanged: null,
+    };
+  },
+  computed: {
+    displayHealthFactor() {
+      const value = Number(this.healthFactorPercent);
+      if (Number.isNaN(value)) return 0;
+      return Math.max(0, Math.round(value));
+    },
+    fillPercent() {
+      return Math.min(this.displayHealthFactor, 100);
+    },
+    overflowPercent() {
+      return Math.max(this.displayHealthFactor - 100, 0);
+    },
+    statusText() {
+      if (this.displayHealthFactor < 100) return "At Risk";
+      if (this.displayHealthFactor < 130) return "Caution";
+      return "Healthy";
+    },
+    statusColor() {
+      if (this.displayHealthFactor < 100) return "#d9534f";
+      if (this.displayHealthFactor < 130) return "#f0ad4e";
+      return "#5cb85c";
+    },
+  },
+  mounted() {
+    this.refreshDashboard();
+
+    if (window.ethereum) {
+      this.onAccountsChanged = () => {
+        this.refreshDashboard();
+      };
+      window.ethereum.on("accountsChanged", this.onAccountsChanged);
+    }
+  },
+  beforeUnmount() {
+    if (window.ethereum && this.onAccountsChanged) {
+      window.ethereum.removeListener("accountsChanged", this.onAccountsChanged);
+    }
+  },
+  methods: {
+    shortAddress(address) {
+      if (!address) return "";
+      return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    },
+
+    getErrorMessage(err) {
+      return (
+        err?.cause?.message ||
+        err?.data?.message ||
+        err?.message ||
+        String(err) ||
+        "Failed to load dashboard"
+      );
+    },
+
+    formatUnits(valueRaw, decimals = 18, fractionDigits = 4) {
+      let value;
+      try {
+        value = BigInt(String(valueRaw ?? "0"));
+      } catch {
+        return "0";
+      }
+
+      const safeDecimals = Number.isFinite(Number(decimals))
+        ? Number(decimals)
+        : 18;
+      const base = 10n ** BigInt(safeDecimals);
+      const whole = value / base;
+      const fraction = value % base;
+      const fractionText = fraction
+        .toString()
+        .padStart(safeDecimals, "0")
+        .slice(0, fractionDigits)
+        .replace(/0+$/, "");
+
+      if (!fractionText) {
+        return whole.toString();
+      }
+
+      return `${whole.toString()}.${fractionText}`;
+    },
+
+    toPercentFromRay(rayValue) {
+      try {
+        const value = BigInt(String(rayValue ?? "0"));
+        if (value <= 0n) return 0;
+
+        const percent = value / 10_000_000_000_000_000n;
+        if (percent > 9_999n) return 9_999;
+        return Number(percent);
+      } catch {
+        return 0;
+      }
+    },
+
+    valueInWei(amountRaw, priceRay, decimals = 18) {
+      const amount = BigInt(String(amountRaw ?? "0"));
+      const price = BigInt(String(priceRay ?? "0"));
+      const base = 10n ** BigInt(decimals);
+      return (amount * price) / base;
+    },
+
+    toAssetLabel(assetAddress) {
+      if (!assetAddress) return "-";
+      const key = assetAddress.toLowerCase();
+      const meta = this.tokenMetaByAddress[key];
+      if (meta?.symbol) return meta.symbol;
+      return this.shortAddress(assetAddress);
+    },
+
+    async readTokenMeta(assetAddress) {
+      const token = new web3.eth.Contract(erc20Abi, assetAddress);
+
+      try {
+        const [symbol, decimals] = await Promise.all([
+          token.methods.symbol().call(),
+          token.methods.decimals().call(),
+        ]);
+        return {
+          symbol,
+          decimals: Number(decimals),
+        };
+      } catch {
+        return {
+          symbol: this.shortAddress(assetAddress),
+          decimals: 18,
+        };
+      }
+    },
+
+    async safeGetPrice(oracle, assetAddress) {
+      try {
+        const result = await oracle.methods.getPrice(assetAddress).call();
+        return String(result || ONE_ETHER_STR);
+      } catch {
+        return ONE_ETHER_STR;
+      }
+    },
+
+    async refreshDashboard() {
+      if (this.loading) {
+        return;
+      }
+
+      this.loading = true;
+      this.error = "";
+
+      try {
+        const accounts = await web3.eth.getAccounts();
+        if (!accounts || accounts.length === 0) {
+          this.account = "";
+          this.totalDepositValueWei = "0";
+          this.totalBorrowValueWei = "0";
+          this.depositRows = [];
+          this.borrowRows = [];
+          this.debtVaults = [];
+          this.healthFactorPercent = 200;
+          this.error = "Please connect MetaMask first";
+          return;
+        }
+
+        this.account = accounts[0];
+
+        const lendingPool = new web3.eth.Contract(
+          lendingPoolAbi,
+          addressJson.LendingPool,
+        );
+        const oracle = new web3.eth.Contract(ORACLE_ABI, addressJson.Oracle);
+
+        const aliceToken = new web3.eth.Contract(
+          erc20Abi,
+          addressJson.AliceToken,
+        );
+        const bobToken = new web3.eth.Contract(erc20Abi, addressJson.BobToken);
+        const [aliceBalanceRaw, bobBalanceRaw, aliceMeta, bobMeta] =
+          await Promise.all([
+            aliceToken.methods.balanceOf(this.account).call(),
+            bobToken.methods.balanceOf(this.account).call(),
+            this.readTokenMeta(addressJson.AliceToken),
+            this.readTokenMeta(addressJson.BobToken),
+          ]);
+
+        this.aliceBalanceRaw = String(aliceBalanceRaw);
+        this.bobBalanceRaw = String(bobBalanceRaw);
+        this.aliceDecimals = Number(aliceMeta.decimals || 18);
+        this.bobDecimals = Number(bobMeta.decimals || 18);
+
+        const metaByAddress = {
+          [addressJson.AliceToken.toLowerCase()]: aliceMeta,
+          [addressJson.BobToken.toLowerCase()]: bobMeta,
+        };
+
+        const reserveAssets = await lendingPool.methods
+          .getReserveAssets()
+          .call();
+        const debtVaultIds = await lendingPool.methods
+          .getOwnerDebtVaultIds(this.account)
+          .call();
+
+        const unknownReserveAssets = reserveAssets.filter(
+          (asset) => !metaByAddress[asset.toLowerCase()],
+        );
+
+        if (unknownReserveAssets.length > 0) {
+          const unknownMetas = await Promise.all(
+            unknownReserveAssets.map((asset) => this.readTokenMeta(asset)),
+          );
+          unknownReserveAssets.forEach((asset, idx) => {
+            metaByAddress[asset.toLowerCase()] = unknownMetas[idx];
+          });
+        }
+
+        this.tokenMetaByAddress = metaByAddress;
+
+        const reserveRows = await Promise.all(
+          reserveAssets.map(async (assetAddress) => {
+            const key = assetAddress.toLowerCase();
+            const meta = metaByAddress[key] || {
+              symbol: this.shortAddress(assetAddress),
+              decimals: 18,
+            };
+
+            const [custodiedRaw, debtRaw, priceRay] = await Promise.all([
+              lendingPool.methods
+                .getUserCustodiedShares(this.account, assetAddress)
+                .call(),
+              lendingPool.methods
+                .getUserDebtBalance(this.account, assetAddress)
+                .call(),
+              this.safeGetPrice(oracle, assetAddress),
+            ]);
+
+            const depositValueWei = this.valueInWei(
+              custodiedRaw,
+              priceRay,
+              meta.decimals,
+            );
+            const debtValueWei = this.valueInWei(
+              debtRaw,
+              priceRay,
+              meta.decimals,
+            );
+
+            return {
+              assetAddress,
+              symbol: meta.symbol,
+              decimals: meta.decimals,
+              depositRaw: String(custodiedRaw),
+              debtRaw: String(debtRaw),
+              depositValueWei: depositValueWei.toString(),
+              debtValueWei: debtValueWei.toString(),
+            };
+          }),
+        );
+
+        this.depositRows = reserveRows.filter(
+          (row) => BigInt(row.depositRaw) > 0n,
+        );
+        this.borrowRows = reserveRows.filter((row) => BigInt(row.debtRaw) > 0n);
+
+        this.totalDepositValueWei = reserveRows
+          .reduce((sum, row) => sum + BigInt(row.depositValueWei), 0n)
+          .toString();
+        this.totalBorrowValueWei = reserveRows
+          .reduce((sum, row) => sum + BigInt(row.debtValueWei), 0n)
+          .toString();
+
+        const debtVaults = await Promise.all(
+          debtVaultIds.map(async (id) => {
+            const [summary, borrowedAssets] = await Promise.all([
+              lendingPool.methods.getDebtVaultSummary(id).call(),
+              lendingPool.methods.getDebtVaultBorrowedAssets(id).call(),
+            ]);
+
+            return {
+              id: String(id),
+              hfPercent: this.toPercentFromRay(summary.hf),
+              collateralValueWei: String(summary.liquidationThresholdValue),
+              debtValueWei: String(summary.debtValue),
+              maxBorrowableWei: String(summary.maxBorrowableValue),
+              borrowedLabels: borrowedAssets.map((asset) =>
+                this.toAssetLabel(asset),
+              ),
+            };
+          }),
+        );
+
+        this.debtVaults = debtVaults;
+        this.healthFactorPercent = debtVaults.length
+          ? Math.min(...debtVaults.map((vault) => vault.hfPercent))
+          : 200;
+
+        this.lastUpdated = new Date().toLocaleString();
+      } catch (err) {
+        this.error = this.getErrorMessage(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+};
 </script>
-<!-- 
-TODO:
-Dashboard：
-1. 用户代币数量
-2. 用户总存款（代币*市价）
-3. Health Factor
-Loan：
-3. 用户借款
-4. 
--->
+
 <template>
-  <div class="container">
-    <HealthFactor factorPercent="150"></HealthFactor>
-    <CardItem>
-      <h2>card1</h2>
-      <p>11111111111111111111111111111111111111</p>
-    </CardItem>
-    <CardItem>
-      <h2>card2</h2>
-      <p>56484186464864684</p>
-    </CardItem>
+  <div class="dashboard">
+    <section class="top-grid">
+      <CardItem class="overview-card">
+        <div class="card-head">
+          <h3 class="card-title">Overview</h3>
+          <el-button
+            class="refresh-btn"
+            plain
+            size="small"
+            :loading="loading"
+            @click="refreshDashboard"
+            >Refresh</el-button
+          >
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-item metric-item--full">
+            <span class="metric-label">Account</span>
+            <span class="metric-value">{{
+              account ? shortAddress(account) : "-"
+            }}</span>
+          </div>
+          <div class="metric-item metric-item--full">
+            <span class="metric-label">Last Updated</span>
+            <span class="metric-value">{{ lastUpdated || "-" }}</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Alice Balance</span>
+            <span class="metric-value">{{
+              formatUnits(aliceBalanceRaw, aliceDecimals)
+            }}</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Bob Balance</span>
+            <span class="metric-value">{{
+              formatUnits(bobBalanceRaw, bobDecimals)
+            }}</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Total Deposits Value</span>
+            <span class="metric-value">{{
+              formatUnits(totalDepositValueWei)
+            }}</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Total Borrowed Value</span>
+            <span class="metric-value">{{
+              formatUnits(totalBorrowValueWei)
+            }}</span>
+          </div>
+        </div>
+
+        <p v-if="loading" class="loading-line">Loading dashboard...</p>
+        <p v-if="error" class="error-line">{{ error }}</p>
+      </CardItem>
+    </section>
+
+    <section class="bottom-grid">
+      <CardItem class="list-card">
+        <h3 class="card-title">Deposits</h3>
+        <p v-if="!depositRows.length" class="line">No deposited assets</p>
+        <div
+          v-for="row in depositRows"
+          :key="row.assetAddress"
+          class="asset-row"
+        >
+          <p class="line">
+            {{ row.symbol }}: {{ formatUnits(row.depositRaw, row.decimals) }}
+          </p>
+          <p class="sub-line">Value: {{ formatUnits(row.depositValueWei) }}</p>
+        </div>
+      </CardItem>
+
+      <CardItem class="list-card">
+        <h3 class="card-title">Borrows</h3>
+        <p v-if="!borrowRows.length" class="line">No borrowed assets</p>
+        <div
+          v-for="row in borrowRows"
+          :key="row.assetAddress"
+          class="asset-row"
+        >
+          <p class="line">
+            {{ row.symbol }}: {{ formatUnits(row.debtRaw, row.decimals) }}
+          </p>
+          <p class="sub-line">Value: {{ formatUnits(row.debtValueWei) }}</p>
+        </div>
+      </CardItem>
+
+      <CardItem class="vault-card">
+        <div class="vault-head">
+          <h3 class="card-title">Debt Vaults</h3>
+          <div class="hf-display" v-if="debtVaults.length">
+            <span class="hf-label">Health Factor</span>
+            <span class="hf-value" :style="{ color: statusColor }"
+              >{{ displayHealthFactor }}%</span
+            >
+          </div>
+        </div>
+
+        <div v-if="debtVaults.length" class="hf-meter-wrap">
+          <div class="hf-meter">
+            <div
+              class="hf-fill"
+              :style="{
+                width: fillPercent + '%',
+                backgroundColor: statusColor,
+              }"
+            ></div>
+          </div>
+          <div class="hf-scale">
+            <span>0%</span>
+            <span>100%</span>
+          </div>
+          <p v-if="overflowPercent > 0" class="hf-overflow">
+            +{{ overflowPercent }}% above liquidation threshold
+          </p>
+          <p class="hf-status" :style="{ color: statusColor }">
+            {{ statusText }}
+          </p>
+        </div>
+
+        <p v-if="!debtVaults.length" class="line">No DebtVault</p>
+        <div v-for="vault in debtVaults" :key="vault.id" class="vault-row">
+          <div class="vault-header">
+            <p class="vault-id">#{{ vault.id }}</p>
+            <HealthFactor :factorPercent="vault.hfPercent"></HealthFactor>
+          </div>
+          <div class="vault-details">
+            <p class="sub-line">
+              Collateral Value: {{ formatUnits(vault.collateralValueWei) }}
+            </p>
+            <p class="sub-line">
+              Debt Value: {{ formatUnits(vault.debtValueWei) }}
+            </p>
+            <p class="sub-line">
+              Max Borrowable: {{ formatUnits(vault.maxBorrowableWei) }}
+            </p>
+            <p class="sub-line sub-line--full">
+              Borrowed Assets:
+              {{
+                vault.borrowedLabels.length
+                  ? vault.borrowedLabels.join(", ")
+                  : "-"
+              }}
+            </p>
+          </div>
+        </div>
+      </CardItem>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.container {
-  display: flex;
+.dashboard {
   width: 100%;
-  flex-wrap: wrap;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.top-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-top: 15px;
+}
+
+.top-grid :deep(.card-item),
+.bottom-grid :deep(.card-item) {
+  margin: 0;
+  height: 100%;
+}
+
+.overview-card,
+.list-card,
+.vault-card {
+  min-width: 0;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.vault-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.hf-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgb(30, 30, 30);
+}
+
+.hf-label {
+  display: block;
+  font-size: 12px;
+  color: rgb(90, 90, 90);
+}
+
+.hf-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.hf-meter-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgb(235, 235, 235);
+}
+
+.hf-meter {
+  width: 100%;
+  height: 12px;
+  border: 1px solid rgb(210, 210, 210);
+  background-color: rgb(245, 245, 245);
+}
+
+.hf-fill {
+  height: 100%;
+  transition: width 0.35s ease;
+}
+
+.hf-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgb(100, 100, 100);
+}
+
+.hf-overflow {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: rgb(80, 80, 80);
+}
+
+.hf-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-item {
+  border: 1px solid rgb(235, 235, 235);
+  padding: 10px;
+  background: rgb(250, 250, 250);
+}
+
+.metric-item--full {
+  grid-column: 1 / -1;
+}
+
+.metric-label {
+  display: block;
+  font-size: 12px;
+  color: rgb(90, 90, 90);
+  margin-bottom: 4px;
+}
+
+.metric-value {
+  display: block;
+  color: rgb(30, 30, 30);
+  word-break: break-word;
+}
+
+.refresh-btn {
+  background-color: transparent;
+  color: black;
+  border-color: rgb(200, 200, 200);
+}
+
+.refresh-btn:hover {
+  background-color: transparent;
+  border-color: black;
+  color: black;
+}
+
+.line {
+  margin: 6px 0;
+  color: rgb(30, 30, 30);
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.sub-line {
+  margin: 0;
+  color: rgb(90, 90, 90);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sub-line--full {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgb(243, 243, 243);
+}
+
+.asset-row {
+  padding: 10px 0;
+  border-bottom: 1px solid rgb(235, 235, 235);
+}
+
+.asset-row:first-of-type {
+  padding-top: 0;
+}
+
+.asset-row:last-of-type {
+  border-bottom: none;
+}
+
+.vault-row {
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(235, 235, 235);
+}
+
+.vault-row:first-of-type {
+  padding-top: 6px;
+}
+
+.vault-row:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.vault-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.vault-id {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgb(30, 30, 30);
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.vault-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-top: 6px;
+}
+
+.vault-row :deep(.hf-card) {
+  width: 100%;
+  max-width: 150px;
+}
+
+.loading-line {
+  margin-top: 10px;
+  color: rgb(80, 80, 80);
+}
+
+.error-line {
+  margin-top: 10px;
+  color: #d9534f;
+  word-break: break-word;
+}
+
+@media (max-width: 1200px) {
+  .bottom-grid {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hf-display {
+    align-items: flex-start;
+  }
+
+  .card-title {
+    font-size: 16px;
+  }
+
+  .vault-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .vault-details {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .sub-line--full {
+    margin-top: 4px;
+  }
+
+  .vault-row :deep(.hf-card) {
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 8px;
+    gap: 12px;
+  }
+
+  .top-grid {
+    gap: 12px;
+  }
+
+  .bottom-grid {
+    gap: 12px;
+  }
+
+  .metrics-grid {
+    gap: 8px;
+  }
+
+  .metric-item {
+    padding: 8px;
+  }
+
+  .metric-label {
+    font-size: 11px;
+  }
+
+  .line {
+    margin: 6px 0;
+    font-size: 14px;
+  }
+
+  .sub-line {
+    margin: 3px 0;
+    font-size: 12px;
+  }
+
+  .asset-row {
+    padding: 8px 0;
+    margin-bottom: 2px;
+  }
+
+  .vault-row {
+    padding: 12px 0;
+    margin-bottom: 4px;
+  }
+
+  .vault-id {
+    font-size: 13px;
+  }
+
+  .hf-label {
+    font-size: 11px;
+  }
+
+  .hf-value {
+    font-size: 18px;
+  }
+
+  .vault-row :deep(.hf-card) {
+    max-width: 120px;
+  }
 }
 </style>

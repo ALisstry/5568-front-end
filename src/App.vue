@@ -103,8 +103,10 @@ header {
   height: 10vh;
   width: 100%;
   display: flex;
-  justify-content: right;
+  justify-content: space-between;
   align-items: center;
+  padding: 0 20px;
+  box-sizing: border-box;
   /* backdrop-filter: blur(10px); */
   /* background: linear-gradient(to top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.8)); */
 }
@@ -113,16 +115,18 @@ header {
   border-radius: 5px;
   padding: 20px;
   backdrop-filter: blur(10px); */
-  margin: auto auto auto 20px;
+  margin: 0;
   user-select: none;
   -webkit-user-drag: none;
   height: 100%;
+  flex-shrink: 0;
   /* backdrop-filter: blur(20px); */
 }
 .settings {
-  margin: auto 20px auto 0px;
+  margin: 0;
   font-size: large;
   font-weight: bold;
+  flex-shrink: 0;
 }
 
 aside {
@@ -210,6 +214,8 @@ aside {
 
 main {
   grid-area: main;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 footer {
@@ -219,9 +225,33 @@ footer {
   justify-content: center;
   align-items: center;
   border-top: solid rgb(200, 200, 200) 1px;
+  background: white;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    grid-template-rows: 8vh 1fr 3vh;
+  }
+
+  header {
+    height: 8vh;
+  }
+
+  .banner {
+    padding: 0 10px;
+  }
+
+  aside {
+    border-right: none;
+  }
+
+  .aside-toggle {
+    display: none;
+  }
 }
 
 .Login-wrap {
-  margin-right: 30px;
+  margin: 0;
+  flex-shrink: 0;
 }
 </style>

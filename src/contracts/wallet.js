@@ -8,7 +8,6 @@ export const evmClient = await createEVMClient({
   },
   api: {
     supportedNetworks: {
-      ...getInfuraRpcUrls({ infuraApiKey: "YOUR_INFURA_API_KEY" }),
       // "0x1": "https://mainnet.infura.io/v3/YOUR_INFURA_API_KEY",
       // "0xaa36a7": "https://sepolia.infura.io/v3/YOUR_INFURA_API_KEY",
       "0x7a69": "http://127.0.0.1:8545", // Hardhat Network (本地开发网络)

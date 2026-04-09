@@ -39,18 +39,24 @@ function normalizeDebtVaultId(debtVaultId) {
   if (!/^\d+$/.test(normalized)) {
     throw new Error("Invalid debtVaultId");
   }
-  return normalized;
+  return BigInt(normalized);
 }
 
 async function sendWithEstimate(method, from) {
-  let gas;
   try {
-    gas = await method.estimateGas({ from });
-  } catch {
-    gas = undefined;
+    // 不使用 estimateGas，直接发送让 provider 自动估算
+    // 某些复杂交易的 estimateGas 可能不准确，导致余额不足等错误
+    const result = await method.send({ from });
+    console.log("Transaction sent:", result.transactionHash);
+    return result;
+  } catch (err) {
+    console.error("Transaction failed:", {
+      message: err?.message,
+      reason: err?.data?.message,
+      code: err?.code,
+    });
+    throw err;
   }
-
-  return method.send(gas ? { from, gas } : { from });
 }
 
 export const transferTest = async function () {
@@ -86,7 +92,7 @@ export async function getAccountInfo() {
   alert(
     debtVaultIds.length
       ? `DebtVault IDs: ${debtVaultIds.join(", ")}`
-      : "No DebtVault found"
+      : "No DebtVault found",
   );
 
   return debtVaultIds;
@@ -97,12 +103,37 @@ export async function getOwnerDebtVaultIds(ownerAddress) {
   return lendingPool.methods.getOwnerDebtVaultIds(owner).call();
 }
 
+export async function getReserveAssetsWithConfig() {
+  try {
+    const reserves = await lendingPool.methods.getReserveAssets().call();
+    // 返回所有的储备资产列表
+    // 前端可以根据 API 文档了解哪些资产可以作为抵押物
+    return reserves;
+  } catch (err) {
+    console.error("Failed to get reserve assets:", err);
+    return [];
+  }
+}
+
+export async function getUserCustodiedShares(userAddress, assetAddress) {
+  const user = userAddress || (await getDefaultAccount());
+  try {
+    const shares = await lendingPool.methods
+      .getUserCustodiedShares(user, assetAddress)
+      .call();
+    return String(shares);
+  } catch (err) {
+    console.error("Failed to get custodied shares:", err);
+    return "0";
+  }
+}
+
 export async function openDebtVault() {
   const defaultAccount = await getDefaultAccount();
   const predictedId = await lendingPool.methods.nextDebtVaultId().call();
   const receipt = await sendWithEstimate(
     lendingPool.methods.openDebtVault(),
-    defaultAccount
+    defaultAccount,
   );
 
   return {
@@ -126,7 +157,7 @@ export async function deposit({ asset, amount, unit = "ether" }) {
 
   const receipt = await sendWithEstimate(
     lendingPool.methods.deposit(assetAddress, amountWei),
-    defaultAccount
+    defaultAccount,
   );
 
   return {
@@ -144,7 +175,59 @@ export async function withdraw({ asset, amount, unit = "ether" }) {
 
   const receipt = await sendWithEstimate(
     lendingPool.methods.withdraw(assetAddress, amountWei),
-    defaultAccount
+    defaultAccount,
+  );
+
+  return {
+    txHash: receipt.transactionHash,
+    receipt,
+  };
+}
+
+export async function depositCollateral({
+  debtVaultId,
+  asset,
+  amount,
+  unit = "ether",
+}) {
+  const defaultAccount = await getDefaultAccount();
+  const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
+  const assetAddress = resolveAssetAddress(asset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.depositCollateral(
+      normalizedDebtVaultId,
+      assetAddress,
+      amountWei,
+    ),
+    defaultAccount,
+  );
+
+  return {
+    txHash: receipt.transactionHash,
+    receipt,
+  };
+}
+
+export async function withdrawCollateral({
+  debtVaultId,
+  asset,
+  amount,
+  unit = "ether",
+}) {
+  const defaultAccount = await getDefaultAccount();
+  const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
+  const assetAddress = resolveAssetAddress(asset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const receipt = await sendWithEstimate(
+    lendingPool.methods.withdrawCollateral(
+      normalizedDebtVaultId,
+      assetAddress,
+      amountWei,
+    ),
+    defaultAccount,
   );
 
   return {
@@ -161,7 +244,7 @@ export async function borrow({ debtVaultId, asset, amount, unit = "ether" }) {
 
   const receipt = await sendWithEstimate(
     lendingPool.methods.borrow(normalizedDebtVaultId, assetAddress, amountWei),
-    defaultAccount
+    defaultAccount,
   );
 
   return {
@@ -185,7 +268,7 @@ export async function repay({ debtVaultId, asset, amount, unit = "ether" }) {
 
   const receipt = await sendWithEstimate(
     lendingPool.methods.repay(normalizedDebtVaultId, assetAddress, amountWei),
-    defaultAccount
+    defaultAccount,
   );
 
   return {
@@ -194,4 +277,49 @@ export async function repay({ debtVaultId, asset, amount, unit = "ether" }) {
     receipt,
     approveReceipt,
   };
+}
+
+export async function diagnosticCheck() {
+  console.log("🔍 启动诊断检查...");
+
+  try {
+    // 1. 检查连接
+    const accounts = await web3.eth.getAccounts();
+    console.log("✓ 账户:", accounts[0]);
+
+    // 2. 检查合约地址
+    console.log("✓ LendingPool 地址:", address);
+
+    // 3. 检查合约是否可访问
+    const code = await web3.eth.getCode(address);
+    if (code === "0x") {
+      console.error("❌ 错误：LendingPool 地址上没有合约代码");
+      return false;
+    }
+    console.log("✓ 合约代码存在");
+
+    // 4. 检查账户余额
+    const balance = await web3.eth.getBalance(accounts[0]);
+    console.log("✓ 账户余额:", web3.utils.fromWei(balance, "ether"), "ETH");
+
+    // 5. 尝试简单的 read-only 调用
+    try {
+      const reserves = await lendingPool.methods.getReserveAssets().call();
+      console.log("✓ getReserveAssets 可用，包含:", reserves.length, "个资产");
+    } catch (err) {
+      console.error("❌ getReserveAssets 失败:", err?.message);
+    }
+
+    // 6. 检查 ABI 中的方法
+    const methodNames = abi
+      .filter((item) => item.type === "function")
+      .map((item) => item.name);
+    console.log("✓ ABI 包含", methodNames.length, "个方法");
+
+    console.log("✅ 诊断完成");
+    return true;
+  } catch (err) {
+    console.error("❌ 诊断失败:", err);
+    return false;
+  }
 }

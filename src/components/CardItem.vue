@@ -16,7 +16,7 @@ export default {
 
 <style scoped>
 .card-item {
-  margin: 10px;
+  margin: 0;
   border: 1px solid var(--border-color, rgb(200, 200, 200));
   padding: 10px;
   transition:
