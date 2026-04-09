@@ -9,7 +9,12 @@
         <el-select
           v-model="action"
           class="full-width"
-          style="--el-color-primary: black; --el-border-color-hover: gray"
+          style="
+            --el-color-primary: black;
+            --el-border-color-hover: gray;
+            --el-text-color-primary: black;
+          "
+          popper-class="selectStyle"
         >
           <el-option label="Deposit" value="deposit"></el-option>
           <el-option label="Withdraw" value="withdraw"></el-option>
@@ -20,7 +25,12 @@
         <el-select
           v-model="coin"
           class="full-width"
-          style="--el-color-primary: black; --el-border-color-hover: gray"
+          style="
+            --el-color-primary: black;
+            --el-border-color-hover: gray;
+            --el-text-color-primary: black;
+          "
+          popper-class="selectStyle"
         >
           <el-option label="Alice" value="Alice"></el-option>
           <el-option label="Bob" value="Bob"></el-option>
@@ -41,7 +51,12 @@
             <el-select
               v-model="unit"
               class="full-width"
-              style="--el-color-primary: black; --el-border-color-hover: gray"
+              style="
+                --el-color-primary: black;
+                --el-border-color-hover: gray;
+                --el-text-color-primary: black;
+              "
+              popper-class="selectStyle"
             >
               <el-option label="Ether" value="ether"></el-option>
               <el-option label="Finney" value="finney"></el-option>

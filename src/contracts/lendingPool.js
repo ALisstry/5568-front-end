@@ -42,23 +42,6 @@ function normalizeDebtVaultId(debtVaultId) {
   return BigInt(normalized);
 }
 
-async function sendWithEstimate(method, from) {
-  try {
-    // 不使用 estimateGas，直接发送让 provider 自动估算
-    // 某些复杂交易的 estimateGas 可能不准确，导致余额不足等错误
-    const result = await method.send({ from });
-    console.log("Transaction sent:", result.transactionHash);
-    return result;
-  } catch (err) {
-    console.error("Transaction failed:", {
-      message: err?.message,
-      reason: err?.data?.message,
-      code: err?.code,
-    });
-    throw err;
-  }
-}
-
 export const transferTest = async function () {
   const fromAddress = await getDefaultAccount();
 
@@ -131,10 +114,7 @@ export async function getUserCustodiedShares(userAddress, assetAddress) {
 export async function openDebtVault() {
   const defaultAccount = await getDefaultAccount();
   const predictedId = await lendingPool.methods.nextDebtVaultId().call();
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.openDebtVault(),
-    defaultAccount,
-  );
+  const receipt = await lendingPool.methods.openDebtVault().send({ from: defaultAccount });
 
   return {
     debtVaultId: String(predictedId),
@@ -148,17 +128,10 @@ export async function deposit({ asset, amount, unit = "ether" }) {
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const approveReceipt = await approveIfNeeded({
-    asset: assetAddress,
-    amountWei,
-    owner: defaultAccount,
-    spender: address,
-  });
-
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.deposit(assetAddress, amountWei),
-    defaultAccount,
-  );
+  const [approveReceipt, receipt] = await Promise.all([
+    approveIfNeeded({ asset: assetAddress, amountWei, owner: defaultAccount, spender: address }),
+    lendingPool.methods.deposit(assetAddress, amountWei).send({ from: defaultAccount }),
+  ]);
 
   return {
     txHash: receipt.transactionHash,
@@ -173,10 +146,7 @@ export async function withdraw({ asset, amount, unit = "ether" }) {
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.withdraw(assetAddress, amountWei),
-    defaultAccount,
-  );
+  const receipt = await lendingPool.methods.withdraw(assetAddress, amountWei).send({ from: defaultAccount });
 
   return {
     txHash: receipt.transactionHash,
@@ -195,14 +165,11 @@ export async function depositCollateral({
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.depositCollateral(
-      normalizedDebtVaultId,
-      assetAddress,
-      amountWei,
-    ),
-    defaultAccount,
-  );
+  const receipt = await lendingPool.methods.depositCollateral(
+    normalizedDebtVaultId,
+    assetAddress,
+    amountWei,
+  ).send({ from: defaultAccount });
 
   return {
     txHash: receipt.transactionHash,
@@ -221,14 +188,11 @@ export async function withdrawCollateral({
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.withdrawCollateral(
-      normalizedDebtVaultId,
-      assetAddress,
-      amountWei,
-    ),
-    defaultAccount,
-  );
+  const receipt = await lendingPool.methods.withdrawCollateral(
+    normalizedDebtVaultId,
+    assetAddress,
+    amountWei,
+  ).send({ from: defaultAccount });
 
   return {
     txHash: receipt.transactionHash,
@@ -242,10 +206,7 @@ export async function borrow({ debtVaultId, asset, amount, unit = "ether" }) {
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.borrow(normalizedDebtVaultId, assetAddress, amountWei),
-    defaultAccount,
-  );
+  const receipt = await lendingPool.methods.borrow(normalizedDebtVaultId, assetAddress, amountWei).send({ from: defaultAccount });
 
   return {
     txHash: receipt.transactionHash,
@@ -259,17 +220,10 @@ export async function repay({ debtVaultId, asset, amount, unit = "ether" }) {
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const approveReceipt = await approveIfNeeded({
-    asset: assetAddress,
-    amountWei,
-    owner: defaultAccount,
-    spender: address,
-  });
-
-  const receipt = await sendWithEstimate(
-    lendingPool.methods.repay(normalizedDebtVaultId, assetAddress, amountWei),
-    defaultAccount,
-  );
+  const [approveReceipt, receipt] = await Promise.all([
+    approveIfNeeded({ asset: assetAddress, amountWei, owner: defaultAccount, spender: address }),
+    lendingPool.methods.repay(normalizedDebtVaultId, assetAddress, amountWei).send({ from: defaultAccount }),
+  ]);
 
   return {
     txHash: receipt.transactionHash,

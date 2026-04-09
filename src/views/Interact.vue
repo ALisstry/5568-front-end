@@ -19,8 +19,9 @@ export default {
 .interact-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-  gap: 20px;
+  gap: 40px;
   padding: 16px;
+  margin: 10px;
   box-sizing: border-box;
 }
 

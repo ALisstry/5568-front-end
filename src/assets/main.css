@@ -2,7 +2,8 @@
   margin: 0 auto;
 }
 
-.el-popper.coin-select-popper .el-select-dropdown__item.is-selected {
-  color: black !important;
-  font-weight: 700;
+.selectStyle {
+  .el-select-dropdown__item {
+    color: black;
+  }
 }

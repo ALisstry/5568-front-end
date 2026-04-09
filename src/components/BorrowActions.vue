@@ -9,7 +9,12 @@
         <el-select
           v-model="action"
           class="full-width"
-          style="--el-color-primary: black; --el-border-color-hover: gray"
+          style="
+            --el-color-primary: black;
+            --el-border-color-hover: gray;
+            --el-text-color-primary: black;
+          "
+          popper-class="selectStyle"
         >
           <el-option
             label="Deposit Collateral"
@@ -28,7 +33,12 @@
         <el-select
           v-model="coin"
           class="full-width"
-          style="--el-color-primary: black; --el-border-color-hover: gray"
+          style="
+            --el-color-primary: black;
+            --el-border-color-hover: gray;
+            --el-text-color-primary: black;
+          "
+          popper-class="selectStyle"
         >
           <el-option label="Alice" value="Alice"></el-option>
           <el-option label="Bob" value="Bob"></el-option>
@@ -45,7 +55,12 @@
               default-first-option
               class="full-width"
               placeholder="Select or input DebtVault ID"
-              style="--el-color-primary: black; --el-border-color-hover: gray"
+              style="
+                --el-color-primary: black;
+                --el-border-color-hover: gray;
+                --el-text-color-primary: black;
+              "
+              popper-class="selectStyle"
             >
               <el-option
                 v-for="id in debtVaultIds"
@@ -84,7 +99,12 @@
             <el-select
               v-model="unit"
               class="full-width"
-              style="--el-color-primary: black; --el-border-color-hover: gray"
+              style="
+                --el-color-primary: black;
+                --el-border-color-hover: gray;
+                --el-text-color-primary: black;
+              "
+              popper-class="selectStyle"
             >
               <el-option label="Ether" value="ether"></el-option>
               <el-option label="Finney" value="finney"></el-option>
@@ -427,5 +447,13 @@ export default {
   font-size: 16px;
   font-weight: 600;
   color: rgb(30, 30, 30);
+}
+
+:deep(.el-select-dropdown__item.is-selected) {
+  color: black !important;
+}
+
+:deep(.el-select-dropdown__item.is-selected span) {
+  color: black !important;
 }
 </style>
