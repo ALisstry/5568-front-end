@@ -37,21 +37,16 @@ function getTokenContract(asset) {
   return new web3.eth.Contract(erc20Abi, assetAddress);
 }
 
-export async function getAllowance({ asset, owner, spender = DEFAULT_SPENDER }) {
+export async function getAllowance({
+  asset,
+  owner,
+  spender = DEFAULT_SPENDER,
+}) {
   const tokenContract = getTokenContract(asset);
-  const allowance = await tokenContract.methods.allowance(owner, spender).call();
+  const allowance = await tokenContract.methods
+    .allowance(owner, spender)
+    .call();
   return BigInt(allowance);
-}
-
-async function sendWithEstimate(method, from) {
-  let gas;
-  try {
-    gas = await method.estimateGas({ from });
-  } catch {
-    gas = undefined;
-  }
-
-  return method.send(gas ? { from, gas } : { from });
 }
 
 export async function approveIfNeeded({
@@ -71,6 +66,7 @@ export async function approveIfNeeded({
   }
 
   const tokenContract = getTokenContract(asset);
-  const method = tokenContract.methods.approve(spender, String(required));
-  return sendWithEstimate(method, owner);
+  return await tokenContract.methods
+    .approve(spender, String(required))
+    .send({ from: owner });
 }
