@@ -143,17 +143,16 @@ export async function deposit({ asset, amount, unit = "ether" }) {
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const [approveReceipt, receipt] = await Promise.all([
-    approveIfNeeded({
-      asset: assetAddress,
-      amountWei,
-      owner: defaultAccount,
-      spender: address,
-    }),
-    lendingPool.methods
-      .deposit(assetAddress, amountWei)
-      .send({ from: defaultAccount }),
-  ]);
+  const approveReceipt = await approveIfNeeded({
+    asset: assetAddress,
+    amountWei,
+    owner: defaultAccount,
+    spender: address,
+  });
+
+  const receipt = await lendingPool.methods
+    .deposit(assetAddress, amountWei)
+    .send({ from: defaultAccount });
 
   return {
     txHash: receipt.transactionHash,
@@ -242,23 +241,53 @@ export async function repay({ debtVaultId, asset, amount, unit = "ether" }) {
   const assetAddress = resolveAssetAddress(asset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const [approveReceipt, receipt] = await Promise.all([
-    approveIfNeeded({
-      asset: assetAddress,
-      amountWei,
-      owner: defaultAccount,
-      spender: address,
-    }),
-    lendingPool.methods
-      .repay(normalizedDebtVaultId, assetAddress, amountWei)
-      .send({ from: defaultAccount }),
-  ]);
+  const approveReceipt = await approveIfNeeded({
+    asset: assetAddress,
+    amountWei,
+    owner: defaultAccount,
+    spender: address,
+  });
+
+  const receipt = await lendingPool.methods
+    .repay(normalizedDebtVaultId, assetAddress, amountWei)
+    .send({ from: defaultAccount });
 
   return {
     txHash: receipt.transactionHash,
     approveTxHash: approveReceipt?.transactionHash || "",
     receipt,
     approveReceipt,
+  };
+}
+
+export async function liquidate({
+  debtVaultId,
+  debtAsset,
+  collateralAsset,
+  amount,
+  unit = "ether",
+}) {
+  const defaultAccount = await getDefaultAccount();
+  const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
+  const debtAssetAddress = resolveAssetAddress(debtAsset);
+  const collateralAssetAddress = resolveAssetAddress(collateralAsset);
+  const amountWei = toWeiAmount(amount, unit);
+
+  const approveReceipt = await approveIfNeeded({
+    asset: debtAssetAddress,
+    amountWei,
+    owner: defaultAccount,
+    spender: address,
+  });
+
+  const receipt = await lendingPool.methods
+    .liquidate(normalizedDebtVaultId, debtAssetAddress, collateralAssetAddress, amountWei)
+    .send({ from: defaultAccount });
+
+  return {
+    txHash: receipt.transactionHash,
+    approveTxHash: approveReceipt?.transactionHash || "",
+    receipt,
   };
 }
 

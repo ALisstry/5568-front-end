@@ -1,7 +1,9 @@
 import Dashboard from "@/views/Dashboard.vue";
 import Interact from "@/views/Interact.vue";
 import Test from "@/views/Test.vue";
+import Liquidation from "@/views/Liquidation.vue";
 import { createRouter, createWebHistory } from "vue-router";
+import { pa } from "element-plus/es/locale/index.mjs";
 
 const routes = [
   {
@@ -13,6 +15,11 @@ const routes = [
     path: "/interact",
     name: "interact",
     component: Interact,
+  },
+  {
+    path: "/liquidation",
+    name: "liquidiation",
+    component: Liquidation,
   },
   {
     path: "/test",

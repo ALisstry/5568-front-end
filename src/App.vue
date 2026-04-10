@@ -51,6 +51,13 @@ export default {
         </RouterLink>
         <RouterLink
           class="classify"
+          to="/liquidation"
+          :title="isAsideCollapsed ? 'Liquidation' : ''"
+        >
+          Liquidation
+        </RouterLink>
+        <RouterLink
+          class="classify"
           to="/Test"
           :title="isAsideCollapsed ? 'Test' : ''"
         >
@@ -77,7 +84,8 @@ export default {
     "header header"
     "aside main"
     "footer footer";
-  min-height: 100vh;
+  height: 100vh;
+  
   transition: grid-template-columns 0.25s ease;
 }
 
@@ -216,7 +224,7 @@ main {
   grid-area: main;
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: 87vh;
+  max-height: calc(87vh-1px);
 }
 
 footer {
