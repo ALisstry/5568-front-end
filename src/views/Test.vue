@@ -21,6 +21,41 @@
   <el-divider />
   <el-button @click="withdraw_T">withdraw</el-button>
   <el-divider />
+  <CardItem>
+    <div style="display: grid; gap: 12px">
+      <div style="display: flex; gap: 8px; align-items: center">
+        <el-input
+          v-model="alicePrice"
+          placeholder="Alice price"
+          style="flex: 1"
+        />
+        <el-select v-model="alicePriceUnit" placeholder="Unit" style="width: 110px">
+          <el-option label="Ether" value="ether" />
+          <el-option label="Finney" value="finney" />
+          <el-option label="Szabo" value="szabo" />
+          <el-option label="Gwei" value="gwei" />
+          <el-option label="Wei" value="wei" />
+        </el-select>
+        <el-button type="primary" @click="setAlicePrice1">Set Alice</el-button>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <el-input
+          v-model="bobPrice"
+          placeholder="Bob price"
+          style="flex: 1"
+        />
+        <el-select v-model="bobPriceUnit" placeholder="Unit" style="width: 110px">
+          <el-option label="Ether" value="ether" />
+          <el-option label="Finney" value="finney" />
+          <el-option label="Szabo" value="szabo" />
+          <el-option label="Gwei" value="gwei" />
+          <el-option label="Wei" value="wei" />
+        </el-select>
+        <el-button type="primary" @click="setBobPrice1">Set Bob</el-button>
+      </div>
+    </div>
+  </CardItem>
+  <el-divider />
   <el-button @click="getBobPrice1">getBobPrice</el-button>
   <el-divider />
   <el-button @click="getAlicePrice1">getAlicePrice</el-button>
@@ -41,7 +76,8 @@ import {
   allowance as alice_allowance,
 } from "@/contracts/aliceToken";
 import Web3 from "web3";
-import { getBobPrice, getAlicePrice } from "@/contracts/oracle";
+import { ElMessage } from "element-plus";
+import { getBobPrice, getAlicePrice, setPrice } from "@/contracts/oracle";
 
 import CardItem from "@/components/CardItem.vue";
 export default {
@@ -50,6 +86,10 @@ export default {
     return {
       balance: 0,
       aliceApproveAmount: 0,
+      alicePrice: "1",
+      bobPrice: "1",
+      alicePriceUnit: "ether",
+      bobPriceUnit: "ether",
     };
   },
   methods: {
@@ -79,6 +119,32 @@ export default {
     },
     async aliceAllowance() {
       await alice_allowance();
+    },
+    async setAlicePrice1() {
+      try {
+        const result = await setPrice({
+          asset: "Alice",
+          amount: this.alicePrice,
+          unit: this.alicePriceUnit,
+        });
+        ElMessage.success(`Alice price updated: ${result.txHash}`);
+      } catch (err) {
+        console.error(err);
+        alert(`Alice price update failed: ${err?.message || err}`);
+      }
+    },
+    async setBobPrice1() {
+      try {
+        const result = await setPrice({
+          asset: "Bob",
+          amount: this.bobPrice,
+          unit: this.bobPriceUnit,
+        });
+        ElMessage.success(`Bob price updated: ${result.txHash}`);
+      } catch (err) {
+        console.error(err);
+        alert(`Bob price update failed: ${err?.message || err}`);
+      }
     },
     async withdraw_T() {
       let result;

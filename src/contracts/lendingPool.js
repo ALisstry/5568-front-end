@@ -281,7 +281,12 @@ export async function liquidate({
   });
 
   const receipt = await lendingPool.methods
-    .liquidate(normalizedDebtVaultId, debtAssetAddress, collateralAssetAddress, amountWei)
+    .liquidate(
+      normalizedDebtVaultId,
+      debtAssetAddress,
+      collateralAssetAddress,
+      amountWei,
+    )
     .send({ from: defaultAccount });
 
   return {
