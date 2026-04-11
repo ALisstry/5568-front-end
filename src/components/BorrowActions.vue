@@ -1,50 +1,10 @@
 <template>
-  <CardItem class="borrow-card">
+  <CardItem class="vault-card">
     <div class="card-header">
-      <h3 class="card-title">Borrowing Actions</h3>
+      <h3 class="card-title">DebtVault</h3>
     </div>
 
     <el-form class="action-form" label-position="right" label-width="120px">
-      <el-form-item label="Action">
-        <el-select
-          v-model="action"
-          class="full-width"
-          style="
-            --el-color-primary: black;
-            --el-border-color-hover: gray;
-            --el-text-color-primary: black;
-          "
-          popper-class="selectStyle"
-        >
-          <el-option
-            label="Deposit Collateral"
-            value="depositCollateral"
-          ></el-option>
-          <el-option label="Borrow" value="borrow"></el-option>
-          <el-option label="Repay" value="repay"></el-option>
-          <el-option
-            label="Withdraw Collateral"
-            value="withdrawCollateral"
-          ></el-option>
-        </el-select>
-      </el-form-item>
-
-      <el-form-item label="Coin">
-        <el-select
-          v-model="coin"
-          class="full-width"
-          style="
-            --el-color-primary: black;
-            --el-border-color-hover: gray;
-            --el-text-color-primary: black;
-          "
-          popper-class="selectStyle"
-        >
-          <el-option label="Alice" value="Alice"></el-option>
-          <el-option label="Bob" value="Bob"></el-option>
-        </el-select>
-      </el-form-item>
-
       <el-form-item label="DebtVault">
         <el-row style="width: 100%" :gutter="8">
           <el-col :span="14">
@@ -84,70 +44,320 @@
           </el-col>
         </el-row>
       </el-form-item>
-
-      <el-form-item label="Amount">
-        <el-row style="width: 100%" :gutter="8">
-          <el-col :span="15">
-            <el-input
-              v-model="value"
-              placeholder="Input token amount"
-              clearable
-              style="--el-color-primary: black; --el-border-color-hover: gray"
-            ></el-input>
-          </el-col>
-          <el-col :span="9">
-            <el-select
-              v-model="unit"
-              class="full-width"
-              style="
-                --el-color-primary: black;
-                --el-border-color-hover: gray;
-                --el-text-color-primary: black;
-              "
-              popper-class="selectStyle"
-            >
-              <el-option label="Ether" value="ether"></el-option>
-              <el-option label="Finney" value="finney"></el-option>
-              <el-option label="Szabo" value="szabo"></el-option>
-              <el-option label="Gwei" value="gwei"></el-option>
-              <el-option label="Wei" value="wei"></el-option>
-            </el-select>
-          </el-col>
-        </el-row>
-      </el-form-item>
-
-      <el-form-item>
-        <el-button
-          type="primary"
-          class="submit-btn"
-          :loading="submitting"
-          @click="onSubmit"
-          >{{ submitLabel }}</el-button
-        >
-      </el-form-item>
     </el-form>
 
-    <!-- Data Display Section -->
-    <div v-if="action === 'depositCollateral'" class="data-section">
-      <p class="data-label">Available to Collateralize</p>
-      <p class="data-value">{{ custodiedAmount }} {{ coin }}</p>
-    </div>
-
-    <div v-if="action === 'borrow'" class="data-section">
+    <div class="data-section" v-if="selectedVaultData">
       <p class="data-label">Max Borrowable</p>
-      <p class="data-value">{{ selectedVaultData?.maxBorrowable || "0" }} {{ coin }}</p>
-    </div>
-
-    <div v-if="action === 'repay'" class="data-section">
-      <p class="data-label">Current Debt ({{ coin }})</p>
-      <p class="data-value">{{ debtAmount }} {{ coin }}</p>
-    </div>
-
-    <div v-if="action === 'withdrawCollateral'" class="data-section">
-      <p class="data-label">Available to Withdraw</p>
-      <p class="data-value">{{ vaultCollateral }} {{ coin }}</p>
+      <p class="data-value">
+        {{ formatWei(selectedVaultData.maxBorrowableRaw) }}
+      </p>
+      <p class="data-label">Debt Value</p>
+      <p class="data-value">{{ formatWei(selectedVaultData.debtValueRaw) }}</p>
+      <p class="data-label">Alice Collateral</p>
+      <p class="data-value">
+        {{ formatWei(selectedVaultData.collateralAliceRaw) }}
+      </p>
+      <p class="data-label">Bob Collateral</p>
+      <p class="data-value">
+        {{ formatWei(selectedVaultData.collateralBobRaw) }}
+      </p>
     </div>
   </CardItem>
+  <div class="actions-grid">
+    <CardItem class="action-card">
+      <div class="card-header">
+        <h3 class="card-title">Deposit Collateral</h3>
+      </div>
+
+      <el-form class="action-form" label-position="right" label-width="120px">
+        <el-form-item label="Coin">
+          <el-select
+            v-model="depositCollateralForm.coin"
+            class="full-width"
+            style="
+              --el-color-primary: black;
+              --el-border-color-hover: gray;
+              --el-text-color-primary: black;
+            "
+            popper-class="selectStyle"
+          >
+            <el-option label="Alice" value="Alice"></el-option>
+            <el-option label="Bob" value="Bob"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Amount">
+          <el-row style="width: 100%" :gutter="8">
+            <el-col :span="15">
+              <el-input
+                v-model="depositCollateralForm.value"
+                placeholder="Input token amount"
+                clearable
+                style="--el-color-primary: black; --el-border-color-hover: gray"
+              ></el-input>
+            </el-col>
+            <el-col :span="9">
+              <el-select
+                v-model="depositCollateralForm.unit"
+                class="full-width"
+                style="
+                  --el-color-primary: black;
+                  --el-border-color-hover: gray;
+                  --el-text-color-primary: black;
+                "
+                popper-class="selectStyle"
+              >
+                <el-option label="Ether" value="ether"></el-option>
+                <el-option label="Finney" value="finney"></el-option>
+                <el-option label="Szabo" value="szabo"></el-option>
+                <el-option label="Gwei" value="gwei"></el-option>
+                <el-option label="Wei" value="wei"></el-option>
+              </el-select>
+            </el-col>
+          </el-row>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            class="submit-btn"
+            :loading="depositCollateralForm.submitting"
+            @click="onDepositCollateral"
+            >Deposit Collateral</el-button
+          >
+        </el-form-item>
+      </el-form>
+
+      <div class="data-section">
+        <p class="data-label">Available to Collateralize</p>
+        <p class="data-value">
+          {{ selectedCustodied(depositCollateralForm.coin) }}
+          {{ depositCollateralForm.coin }}
+        </p>
+      </div>
+    </CardItem>
+
+    <CardItem class="action-card">
+      <div class="card-header">
+        <h3 class="card-title">Borrow</h3>
+      </div>
+
+      <el-form class="action-form" label-position="right" label-width="120px">
+        <el-form-item label="Coin">
+          <el-select
+            v-model="borrowForm.coin"
+            class="full-width"
+            style="
+              --el-color-primary: black;
+              --el-border-color-hover: gray;
+              --el-text-color-primary: black;
+            "
+            popper-class="selectStyle"
+          >
+            <el-option label="Alice" value="Alice"></el-option>
+            <el-option label="Bob" value="Bob"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Amount">
+          <el-row style="width: 100%" :gutter="8">
+            <el-col :span="15">
+              <el-input
+                v-model="borrowForm.value"
+                placeholder="Input token amount"
+                clearable
+                style="--el-color-primary: black; --el-border-color-hover: gray"
+              ></el-input>
+            </el-col>
+            <el-col :span="9">
+              <el-select
+                v-model="borrowForm.unit"
+                class="full-width"
+                style="
+                  --el-color-primary: black;
+                  --el-border-color-hover: gray;
+                  --el-text-color-primary: black;
+                "
+                popper-class="selectStyle"
+              >
+                <el-option label="Ether" value="ether"></el-option>
+                <el-option label="Finney" value="finney"></el-option>
+                <el-option label="Szabo" value="szabo"></el-option>
+                <el-option label="Gwei" value="gwei"></el-option>
+                <el-option label="Wei" value="wei"></el-option>
+              </el-select>
+            </el-col>
+          </el-row>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            class="submit-btn"
+            :loading="borrowForm.submitting"
+            @click="onBorrow"
+            >Borrow</el-button
+          >
+        </el-form-item>
+      </el-form>
+
+      <div class="data-section">
+        <p class="data-label">Max Borrowable</p>
+        <p class="data-value">
+          {{
+            selectedVaultData
+              ? formatWei(selectedVaultData.maxBorrowableRaw)
+              : "0"
+          }}
+        </p>
+      </div>
+    </CardItem>
+
+    <CardItem class="action-card">
+      <div class="card-header">
+        <h3 class="card-title">Repay</h3>
+      </div>
+
+      <el-form class="action-form" label-position="right" label-width="120px">
+        <el-form-item label="Coin">
+          <el-select
+            v-model="repayForm.coin"
+            class="full-width"
+            style="
+              --el-color-primary: black;
+              --el-border-color-hover: gray;
+              --el-text-color-primary: black;
+            "
+            popper-class="selectStyle"
+          >
+            <el-option label="Alice" value="Alice"></el-option>
+            <el-option label="Bob" value="Bob"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Amount">
+          <el-row style="width: 100%" :gutter="8">
+            <el-col :span="15">
+              <el-input
+                v-model="repayForm.value"
+                placeholder="Input token amount"
+                clearable
+                style="--el-color-primary: black; --el-border-color-hover: gray"
+              ></el-input>
+            </el-col>
+            <el-col :span="9">
+              <el-select
+                v-model="repayForm.unit"
+                class="full-width"
+                style="
+                  --el-color-primary: black;
+                  --el-border-color-hover: gray;
+                  --el-text-color-primary: black;
+                "
+                popper-class="selectStyle"
+              >
+                <el-option label="Ether" value="ether"></el-option>
+                <el-option label="Finney" value="finney"></el-option>
+                <el-option label="Szabo" value="szabo"></el-option>
+                <el-option label="Gwei" value="gwei"></el-option>
+                <el-option label="Wei" value="wei"></el-option>
+              </el-select>
+            </el-col>
+          </el-row>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            class="submit-btn"
+            :loading="repayForm.submitting"
+            @click="onRepay"
+            >Repay</el-button
+          >
+        </el-form-item>
+      </el-form>
+
+      <div class="data-section">
+        <p class="data-label">Current Debt ({{ repayForm.coin }})</p>
+        <p class="data-value">
+          {{ selectedDebt(repayForm.coin) }} {{ repayForm.coin }}
+        </p>
+      </div>
+    </CardItem>
+
+    <CardItem class="action-card">
+      <div class="card-header">
+        <h3 class="card-title">Withdraw Collateral</h3>
+      </div>
+
+      <el-form class="action-form" label-position="right" label-width="120px">
+        <el-form-item label="Coin">
+          <el-select
+            v-model="withdrawCollateralForm.coin"
+            class="full-width"
+            style="
+              --el-color-primary: black;
+              --el-border-color-hover: gray;
+              --el-text-color-primary: black;
+            "
+            popper-class="selectStyle"
+          >
+            <el-option label="Alice" value="Alice"></el-option>
+            <el-option label="Bob" value="Bob"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Amount">
+          <el-row style="width: 100%" :gutter="8">
+            <el-col :span="15">
+              <el-input
+                v-model="withdrawCollateralForm.value"
+                placeholder="Input token amount"
+                clearable
+                style="--el-color-primary: black; --el-border-color-hover: gray"
+              ></el-input>
+            </el-col>
+            <el-col :span="9">
+              <el-select
+                v-model="withdrawCollateralForm.unit"
+                class="full-width"
+                style="
+                  --el-color-primary: black;
+                  --el-border-color-hover: gray;
+                  --el-text-color-primary: black;
+                "
+                popper-class="selectStyle"
+              >
+                <el-option label="Ether" value="ether"></el-option>
+                <el-option label="Finney" value="finney"></el-option>
+                <el-option label="Szabo" value="szabo"></el-option>
+                <el-option label="Gwei" value="gwei"></el-option>
+                <el-option label="Wei" value="wei"></el-option>
+              </el-select>
+            </el-col>
+          </el-row>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            class="submit-btn"
+            :loading="withdrawCollateralForm.submitting"
+            @click="onWithdrawCollateral"
+            >Withdraw Collateral</el-button
+          >
+        </el-form-item>
+      </el-form>
+
+      <div class="data-section">
+        <p class="data-label">Available to Withdraw</p>
+        <p class="data-value">
+          {{ selectedVaultCollateral(withdrawCollateralForm.coin) }}
+          {{ withdrawCollateralForm.coin }}
+        </p>
+      </div>
+    </CardItem>
+  </div>
 </template>
 
 <script>
@@ -175,14 +385,33 @@ export default {
   },
   data() {
     return {
-      action: "depositCollateral",
-      coin: "Alice",
-      value: "",
-      unit: "ether",
       debtVaultId: "",
       debtVaultIds: [],
-      submitting: false,
       creatingVault: false,
+      depositCollateralForm: {
+        coin: "Alice",
+        value: "",
+        unit: "ether",
+        submitting: false,
+      },
+      borrowForm: {
+        coin: "Alice",
+        value: "",
+        unit: "ether",
+        submitting: false,
+      },
+      repayForm: {
+        coin: "Alice",
+        value: "",
+        unit: "ether",
+        submitting: false,
+      },
+      withdrawCollateralForm: {
+        coin: "Alice",
+        value: "",
+        unit: "ether",
+        submitting: false,
+      },
       custodiedAlice: "0",
       custodiedBob: "0",
       debtAlice: "0",
@@ -191,53 +420,13 @@ export default {
     };
   },
   computed: {
-    submitLabel() {
-      if (this.action === "depositCollateral") return "Deposit Collateral";
-      if (this.action === "borrow") return "Borrow";
-      if (this.action === "repay") return "Repay";
-      return "Withdraw Collateral";
-    },
-    custodiedAmount() {
-      const raw =
-        this.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
-      try {
-        return web3.utils.fromWei(raw, "ether");
-      } catch {
-        return "0";
-      }
-    },
-    debtAmount() {
-      const raw =
-        this.coin === "Alice" ? this.debtAlice : this.debtBob;
-      try {
-        return web3.utils.fromWei(raw, "ether");
-      } catch {
-        return "0";
-      }
-    },
-    vaultCollateral() {
-      if (!this.selectedVaultData) return "0";
-      return this.coin === "Alice"
-        ? this.selectedVaultData.collateralAlice || "0"
-        : this.selectedVaultData.collateralBob || "0";
-    },
     selectedVaultData() {
-      return this.vaultDataCache[this.debtVaultId];
+      return this.vaultDataCache[this.debtVaultId] || null;
     },
   },
   watch: {
-    action() {
-      // Refresh data when action changes
-      if (this.debtVaultId) {
-        this.loadVaultData();
-      }
-    },
     debtVaultId() {
-      if (
-        this.action === "borrow" ||
-        this.action === "repay" ||
-        this.action === "withdrawCollateral"
-      ) {
+      if (this.debtVaultId) {
         this.loadVaultData();
       }
     },
@@ -248,6 +437,35 @@ export default {
     await this.refreshDebtBalance();
   },
   methods: {
+    formatWei(raw) {
+      try {
+        return web3.utils.fromWei(String(raw || "0"), "ether");
+      } catch {
+        return "0";
+      }
+    },
+
+    selectedCustodied(coin) {
+      const raw = coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+      return this.formatWei(raw);
+    },
+
+    selectedDebt(coin) {
+      const raw = coin === "Alice" ? this.debtAlice : this.debtBob;
+      return this.formatWei(raw);
+    },
+
+    selectedVaultCollateralRaw(coin) {
+      if (!this.selectedVaultData) return "0";
+      return coin === "Alice"
+        ? this.selectedVaultData.collateralAliceRaw
+        : this.selectedVaultData.collateralBobRaw;
+    },
+
+    selectedVaultCollateral(coin) {
+      return this.formatWei(this.selectedVaultCollateralRaw(coin));
+    },
+
     async refreshDebtVaultIds() {
       try {
         const ids = await getOwnerDebtVaultIds();
@@ -301,15 +519,13 @@ export default {
       try {
         const lendingPool = new web3.eth.Contract(
           lendingPoolAbi,
-          addressJson.LendingPool
+          addressJson.LendingPool,
         );
         const aliceAddr = resolveAssetAddress("Alice");
         const bobAddr = resolveAssetAddress("Bob");
 
         const [summary, aliceCollateral, bobCollateral] = await Promise.all([
-          lendingPool.methods
-            .getDebtVaultSummary(this.debtVaultId)
-            .call(),
+          lendingPool.methods.getDebtVaultSummary(this.debtVaultId).call(),
           lendingPool.methods
             .getDebtVaultCollateralAssetAmount(this.debtVaultId, aliceAddr)
             .call(),
@@ -318,17 +534,11 @@ export default {
             .call(),
         ]);
 
-        const maxBorrowable = web3.utils.fromWei(
-          summary.maxBorrowableValue,
-          "ether"
-        );
-        const debt = web3.utils.fromWei(summary.debtValue, "ether");
-
         this.vaultDataCache[this.debtVaultId] = {
-          maxBorrowable,
-          debt,
-          collateralAlice: web3.utils.fromWei(aliceCollateral, "ether"),
-          collateralBob: web3.utils.fromWei(bobCollateral, "ether"),
+          maxBorrowableRaw: String(summary.maxBorrowableValue || "0"),
+          debtValueRaw: String(summary.debtValue || "0"),
+          collateralAliceRaw: String(aliceCollateral || "0"),
+          collateralBobRaw: String(bobCollateral || "0"),
         };
       } catch (err) {
         console.error("Failed to load vault data:", err);
@@ -380,78 +590,153 @@ export default {
       }
     },
 
-    async onSubmit() {
-      if (this.submitting) {
-        return;
-      }
-
-      if (!this.value || Number(this.value) <= 0) {
-        ElMessage.warning("Amount must be greater than 0");
-        return;
-      }
-
+    validateCommonForm(form) {
       if (!/^\d+$/.test(String(this.debtVaultId || "").trim())) {
         ElMessage.warning("DebtVault ID is required");
+        return false;
+      }
+
+      if (!form.value || Number(form.value) <= 0) {
+        ElMessage.warning("Amount must be greater than 0");
+        return false;
+      }
+
+      return true;
+    },
+
+    async onDepositCollateral() {
+      const form = this.depositCollateralForm;
+      if (form.submitting || !this.validateCommonForm(form)) {
         return;
       }
 
-      if (this.action === "depositCollateral") {
-        const available =
-          this.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
-        const availableBigInt = BigInt(available || "0");
-        const requestedWei = this.amountToWei(this.value, this.unit);
-        const requestedBigInt = BigInt(requestedWei);
-
-        if (requestedBigInt > availableBigInt) {
-          ElMessage.warning(
-            `Insufficient available assets. Requested: ${this.value} ${this.unit}, Available: ${available} wei`,
-          );
-          return;
-        }
+      const available =
+        form.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+      const requestedWei = this.amountToWei(form.value, form.unit);
+      if (BigInt(requestedWei) > BigInt(available || "0")) {
+        ElMessage.warning(
+          `Insufficient available assets. Available: ${this.selectedCustodied(form.coin)} ${form.coin}`,
+        );
+        return;
       }
 
-      this.submitting = true;
+      form.submitting = true;
       try {
-        const payload = {
-          asset: this.coin,
-          amount: this.value,
-          unit: this.unit,
+        const result = await depositCollateral({
           debtVaultId: this.debtVaultId,
-        };
+          asset: form.coin,
+          amount: form.value,
+          unit: form.unit,
+        });
 
-        let result;
-        if (this.action === "depositCollateral") {
-          result = await depositCollateral(payload);
-        } else if (this.action === "borrow") {
-          result = await borrow(payload);
-        } else if (this.action === "repay") {
-          result = await repay(payload);
-        } else {
-          result = await withdrawCollateral(payload);
-        }
+        ElMessage.success(`Deposit Collateral success. Tx: ${result.txHash}`);
+        await this.refreshCustodiedShares();
+        await this.loadVaultData();
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      } finally {
+        form.submitting = false;
+      }
+    },
+
+    async onBorrow() {
+      const form = this.borrowForm;
+      if (form.submitting || !this.validateCommonForm(form)) {
+        return;
+      }
+
+      form.submitting = true;
+      try {
+        const result = await borrow({
+          debtVaultId: this.debtVaultId,
+          asset: form.coin,
+          amount: form.value,
+          unit: form.unit,
+        });
+
+        ElMessage.success(`Borrow success. Tx: ${result.txHash}`);
+        await this.refreshDebtBalance();
+        await this.loadVaultData();
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      } finally {
+        form.submitting = false;
+      }
+    },
+
+    async onRepay() {
+      const form = this.repayForm;
+      if (form.submitting || !this.validateCommonForm(form)) {
+        return;
+      }
+
+      const currentDebtRaw =
+        form.coin === "Alice" ? this.debtAlice : this.debtBob;
+      const requestedWei = this.amountToWei(form.value, form.unit);
+      if (
+        BigInt(currentDebtRaw || "0") > 0n &&
+        BigInt(requestedWei) > BigInt(currentDebtRaw)
+      ) {
+        ElMessage.warning(
+          `Repay amount exceeds current debt. Current debt: ${this.selectedDebt(form.coin)} ${form.coin}`,
+        );
+        return;
+      }
+
+      form.submitting = true;
+      try {
+        const result = await repay({
+          debtVaultId: this.debtVaultId,
+          asset: form.coin,
+          amount: form.value,
+          unit: form.unit,
+        });
 
         const tip = result.approveTxHash
           ? `Approve: ${result.approveTxHash} | Tx: ${result.txHash}`
           : `Tx: ${result.txHash}`;
 
-        ElMessage.success(`${this.submitLabel} success. ${tip}`);
-
-        if (
-          this.action === "depositCollateral" ||
-          this.action === "withdrawCollateral"
-        ) {
-          await this.refreshCustodiedShares();
-        }
-        if (
-          this.action === "borrow" ||
-          this.action === "repay"
-        ) {
-          await this.refreshDebtBalance();
-        }
+        ElMessage.success(`Repay success. ${tip}`);
+        await this.refreshDebtBalance();
+        await this.loadVaultData();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
       } finally {
-        this.submitting = false;
+        form.submitting = false;
+      }
+    },
+
+    async onWithdrawCollateral() {
+      const form = this.withdrawCollateralForm;
+      if (form.submitting || !this.validateCommonForm(form)) {
+        return;
+      }
+
+      const availableRaw = this.selectedVaultCollateralRaw(form.coin);
+      const requestedWei = this.amountToWei(form.value, form.unit);
+      if (BigInt(requestedWei) > BigInt(availableRaw || "0")) {
+        ElMessage.warning(
+          `Insufficient collateral. Available: ${this.selectedVaultCollateral(form.coin)} ${form.coin}`,
+        );
+        return;
+      }
+
+      form.submitting = true;
+      try {
+        const result = await withdrawCollateral({
+          debtVaultId: this.debtVaultId,
+          asset: form.coin,
+          amount: form.value,
+          unit: form.unit,
+        });
+
+        ElMessage.success(`Withdraw Collateral success. Tx: ${result.txHash}`);
+        await this.refreshCustodiedShares();
+        await this.loadVaultData();
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      } finally {
+        form.submitting = false;
       }
     },
   },
@@ -459,8 +744,18 @@ export default {
 </script>
 
 <style scoped>
-.borrow-card {
+.actions-grid {
   width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px;
+  margin-top: 10px;
+}
+
+.vault-card,
+.action-card {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card-header {
@@ -499,17 +794,6 @@ export default {
 .submit-btn:active,
 .mini-btn:active {
   background-color: rgb(200, 200, 200);
-}
-
-.operation-tip {
-  margin-top: 12px;
-  padding: 8px 10px;
-  background: rgb(230, 245, 255);
-  border-left: 3px solid rgb(66, 133, 244);
-  border-radius: 2px;
-  font-size: 12px;
-  color: rgb(30, 80, 140);
-  line-height: 1.4;
 }
 
 .data-section {

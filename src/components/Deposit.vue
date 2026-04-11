@@ -66,7 +66,9 @@
 
       <div class="data-section">
         <p class="data-label">Balance Available</p>
-        <p class="data-value">{{ selectedBalance(depositForm.coin) }} {{ depositForm.coin }}</p>
+        <p class="data-value">
+          {{ selectedBalance(depositForm.coin) }} {{ depositForm.coin }}
+        </p>
       </div>
     </CardItem>
 
@@ -229,12 +231,9 @@ export default {
 
         const aliceToken = new web3.eth.Contract(
           erc20Abi,
-          addressJson.AliceToken
+          addressJson.AliceToken,
         );
-        const bobToken = new web3.eth.Contract(
-          erc20Abi,
-          addressJson.BobToken
-        );
+        const bobToken = new web3.eth.Contract(erc20Abi, addressJson.BobToken);
 
         const [aliceBalance, bobBalance] = await Promise.all([
           aliceToken.methods.balanceOf(accounts[0]).call(),
@@ -354,12 +353,13 @@ export default {
 .actions-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: 1fr;
   gap: 20px;
 }
 
 .action-card {
   width: 100%;
+  box-sizing: border-box;
 }
 
 .card-header {
