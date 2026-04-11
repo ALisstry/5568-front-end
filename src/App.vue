@@ -22,7 +22,6 @@ export default {
   <div class="layout" :class="{ 'aside-collapsed': isAsideCollapsed }">
     <header class="header">
       <div class="banner">
-        <!-- <h1 class="title">5568 Project</h1> -->
         <img
           class="title"
           src="./assets/img/5568Project_ba-style@nulla.top.png"
@@ -47,7 +46,14 @@ export default {
           to="/Interact"
           :title="isAsideCollapsed ? 'Interact' : ''"
         >
-          Interact
+          Deposit & Withdraw
+        </RouterLink>
+        <RouterLink
+          class="classify"
+          to="/borrow"
+          :title="isAsideCollapsed ? 'Borrow' : ''"
+        >
+          Borrow & Repay
         </RouterLink>
         <RouterLink
           class="classify"
@@ -85,7 +91,7 @@ export default {
     "aside main"
     "footer footer";
   height: 100vh;
-  
+
   transition: grid-template-columns 0.25s ease;
 }
 
@@ -96,18 +102,13 @@ export default {
 header {
   position: relative;
   grid-area: header;
-  /* background-color: #ccff99; */
   height: 10vh;
-  /* border-bottom: solid gray 1px; */
-
-  /* align-items: center; */
   background-image: url("./assets/img/a8dcb9d05c22e7e5cfb1bbd0d97092f4edd357ef.png@3840w_360h_1c.webp");
   background-position: -45px;
   color: white;
 }
 
 .banner {
-  /* position: absolute; */
   height: 10vh;
   width: 100%;
   display: flex;
@@ -115,20 +116,13 @@ header {
   align-items: center;
   padding: 0 20px;
   box-sizing: border-box;
-  /* backdrop-filter: blur(10px); */
-  /* background: linear-gradient(to top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.8)); */
 }
 .title {
-  /* border: solid 1px white;
-  border-radius: 5px;
-  padding: 20px;
-  backdrop-filter: blur(10px); */
   margin: 0;
   user-select: none;
   -webkit-user-drag: none;
   height: 100%;
   flex-shrink: 0;
-  /* backdrop-filter: blur(20px); */
 }
 .settings {
   margin: 0;
@@ -139,7 +133,6 @@ header {
 
 aside {
   grid-area: aside;
-  /* background-color: #99ccff; */
   display: flex;
   flex-direction: column;
   align-items: center;

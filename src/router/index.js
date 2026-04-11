@@ -1,9 +1,9 @@
 import Dashboard from "@/views/Dashboard.vue";
 import Interact from "@/views/Interact.vue";
+import Borrow from "@/views/Borrow.vue";
 import Test from "@/views/Test.vue";
 import Liquidation from "@/views/Liquidation.vue";
 import { createRouter, createWebHistory } from "vue-router";
-import { pa } from "element-plus/es/locale/index.mjs";
 
 const routes = [
   {
@@ -17,8 +17,13 @@ const routes = [
     component: Interact,
   },
   {
+    path: "/borrow",
+    name: "borrow",
+    component: Borrow,
+  },
+  {
     path: "/liquidation",
-    name: "liquidiation",
+    name: "liquidation",
     component: Liquidation,
   },
   {

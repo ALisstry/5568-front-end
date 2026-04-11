@@ -1,95 +1,147 @@
 <template>
-  <CardItem class="deposit-card">
-    <div class="card-header">
-      <h3 class="card-title">Deposit & Withdraw</h3>
-    </div>
+  <div class="actions-grid">
+    <CardItem class="action-card">
+      <div class="card-header">
+        <h3 class="card-title">Deposit</h3>
+      </div>
 
-    <el-form class="action-form" label-position="right" label-width="120px">
-      <el-form-item label="Action">
-        <el-select
-          v-model="action"
-          class="full-width"
-          style="
-            --el-color-primary: black;
-            --el-border-color-hover: gray;
-            --el-text-color-primary: black;
-          "
-          popper-class="selectStyle"
-        >
-          <el-option label="Deposit" value="deposit"></el-option>
-          <el-option label="Withdraw" value="withdraw"></el-option>
-        </el-select>
-      </el-form-item>
+      <el-form class="action-form" label-position="right" label-width="120px">
+        <el-form-item label="Coin">
+          <el-select
+            v-model="depositForm.coin"
+            class="full-width"
+            style="
+              --el-color-primary: black;
+              --el-border-color-hover: gray;
+              --el-text-color-primary: black;
+            "
+            popper-class="selectStyle"
+          >
+            <el-option label="Alice" value="Alice"></el-option>
+            <el-option label="Bob" value="Bob"></el-option>
+          </el-select>
+        </el-form-item>
 
-      <el-form-item label="Coin">
-        <el-select
-          v-model="coin"
-          class="full-width"
-          style="
-            --el-color-primary: black;
-            --el-border-color-hover: gray;
-            --el-text-color-primary: black;
-          "
-          popper-class="selectStyle"
-        >
-          <el-option label="Alice" value="Alice"></el-option>
-          <el-option label="Bob" value="Bob"></el-option>
-        </el-select>
-      </el-form-item>
+        <el-form-item label="Amount">
+          <el-row style="width: 100%" :gutter="8">
+            <el-col :span="15">
+              <el-input
+                v-model="depositForm.value"
+                placeholder="Input token amount"
+                clearable
+                style="--el-color-primary: black; --el-border-color-hover: gray"
+              ></el-input>
+            </el-col>
+            <el-col :span="9">
+              <el-select
+                v-model="depositForm.unit"
+                class="full-width"
+                style="
+                  --el-color-primary: black;
+                  --el-border-color-hover: gray;
+                  --el-text-color-primary: black;
+                "
+                popper-class="selectStyle"
+              >
+                <el-option label="Ether" value="ether"></el-option>
+                <el-option label="Finney" value="finney"></el-option>
+                <el-option label="Szabo" value="szabo"></el-option>
+                <el-option label="Gwei" value="gwei"></el-option>
+                <el-option label="Wei" value="wei"></el-option>
+              </el-select>
+            </el-col>
+          </el-row>
+        </el-form-item>
 
-      <el-form-item label="Amount">
-        <el-row style="width: 100%" :gutter="8">
-          <el-col :span="15">
-            <el-input
-              v-model="value"
-              placeholder="Input token amount"
-              clearable
-              style="--el-color-primary: black; --el-border-color-hover: gray"
-            ></el-input>
-          </el-col>
-          <el-col :span="9">
-            <el-select
-              v-model="unit"
-              class="full-width"
-              style="
-                --el-color-primary: black;
-                --el-border-color-hover: gray;
-                --el-text-color-primary: black;
-              "
-              popper-class="selectStyle"
-            >
-              <el-option label="Ether" value="ether"></el-option>
-              <el-option label="Finney" value="finney"></el-option>
-              <el-option label="Szabo" value="szabo"></el-option>
-              <el-option label="Gwei" value="gwei"></el-option>
-              <el-option label="Wei" value="wei"></el-option>
-            </el-select>
-          </el-col>
-        </el-row>
-      </el-form-item>
+        <el-form-item>
+          <el-button
+            type="primary"
+            class="submit-btn"
+            :loading="depositForm.submitting"
+            @click="onDeposit"
+            >Deposit</el-button
+          >
+        </el-form-item>
+      </el-form>
 
-      <el-form-item>
-        <el-button
-          type="primary"
-          class="submit-btn"
-          :loading="submitting"
-          @click="onSubmit"
-          >{{ submitLabel }}</el-button
-        >
-      </el-form-item>
-    </el-form>
+      <div class="data-section">
+        <p class="data-label">Balance Available</p>
+        <p class="data-value">{{ selectedBalance(depositForm.coin) }} {{ depositForm.coin }}</p>
+      </div>
+    </CardItem>
 
-    <!-- Data Display Section -->
-    <div v-if="action === 'deposit'" class="data-section">
-      <p class="data-label">Balance Available</p>
-      <p class="data-value">{{ balance }} {{ coin }}</p>
-    </div>
+    <CardItem class="action-card">
+      <div class="card-header">
+        <h3 class="card-title">Withdraw</h3>
+      </div>
 
-    <div v-if="action === 'withdraw'" class="data-section">
-      <p class="data-label">Available (Pool Custody)</p>
-      <p class="data-value">{{ custodiedAmount }} {{ coin }}</p>
-    </div>
-  </CardItem>
+      <el-form class="action-form" label-position="right" label-width="120px">
+        <el-form-item label="Coin">
+          <el-select
+            v-model="withdrawForm.coin"
+            class="full-width"
+            style="
+              --el-color-primary: black;
+              --el-border-color-hover: gray;
+              --el-text-color-primary: black;
+            "
+            popper-class="selectStyle"
+          >
+            <el-option label="Alice" value="Alice"></el-option>
+            <el-option label="Bob" value="Bob"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Amount">
+          <el-row style="width: 100%" :gutter="8">
+            <el-col :span="15">
+              <el-input
+                v-model="withdrawForm.value"
+                placeholder="Input token amount"
+                clearable
+                style="--el-color-primary: black; --el-border-color-hover: gray"
+              ></el-input>
+            </el-col>
+            <el-col :span="9">
+              <el-select
+                v-model="withdrawForm.unit"
+                class="full-width"
+                style="
+                  --el-color-primary: black;
+                  --el-border-color-hover: gray;
+                  --el-text-color-primary: black;
+                "
+                popper-class="selectStyle"
+              >
+                <el-option label="Ether" value="ether"></el-option>
+                <el-option label="Finney" value="finney"></el-option>
+                <el-option label="Szabo" value="szabo"></el-option>
+                <el-option label="Gwei" value="gwei"></el-option>
+                <el-option label="Wei" value="wei"></el-option>
+              </el-select>
+            </el-col>
+          </el-row>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            class="submit-btn"
+            :loading="withdrawForm.submitting"
+            @click="onWithdraw"
+            >Withdraw</el-button
+          >
+        </el-form-item>
+      </el-form>
+
+      <div class="data-section">
+        <p class="data-label">Available (Pool Custody)</p>
+        <p class="data-value">
+          {{ selectedCustodied(withdrawForm.coin) }} {{ withdrawForm.coin }}
+        </p>
+      </div>
+    </CardItem>
+  </div>
 </template>
 
 <script>
@@ -112,50 +164,47 @@ export default {
   },
   data() {
     return {
-      action: "deposit",
-      coin: "Alice",
-      value: "",
-      unit: "ether",
-      submitting: false,
+      depositForm: {
+        coin: "Alice",
+        value: "",
+        unit: "ether",
+        submitting: false,
+      },
+      withdrawForm: {
+        coin: "Alice",
+        value: "",
+        unit: "ether",
+        submitting: false,
+      },
       custodiedAlice: "0",
       custodiedBob: "0",
       balanceAlice: "0",
       balanceBob: "0",
     };
   },
-  computed: {
-    submitLabel() {
-      return this.action === "deposit" ? "Deposit" : "Withdraw";
-    },
-    custodiedAmount() {
-      const raw =
-        this.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
-      try {
-        return web3.utils.fromWei(raw, "ether");
-      } catch {
-        return "0";
-      }
-    },
-    balance() {
-      const raw =
-        this.coin === "Alice" ? this.balanceAlice : this.balanceBob;
-      try {
-        return web3.utils.fromWei(raw, "ether");
-      } catch {
-        return "0";
-      }
-    },
-  },
-  watch: {
-    action() {
-      // No debtVault needed for simple deposit/withdraw
-    },
-  },
   async mounted() {
     await this.refreshCustodiedShares();
     await this.refreshBalance();
   },
   methods: {
+    selectedCustodied(coin) {
+      const raw = coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+      try {
+        return web3.utils.fromWei(raw, "ether");
+      } catch {
+        return "0";
+      }
+    },
+
+    selectedBalance(coin) {
+      const raw = coin === "Alice" ? this.balanceAlice : this.balanceBob;
+      try {
+        return web3.utils.fromWei(raw, "ether");
+      } catch {
+        return "0";
+      }
+    },
+
     async refreshCustodiedShares() {
       try {
         const aliceAddr = resolveAssetAddress("Alice");
@@ -224,58 +273,77 @@ export default {
       return message;
     },
 
-    async onSubmit() {
-      if (this.submitting) {
+    async onDeposit() {
+      const form = this.depositForm;
+      if (form.submitting) {
         return;
       }
 
-      if (!this.value || Number(this.value) <= 0) {
+      if (!form.value || Number(form.value) <= 0) {
         ElMessage.warning("Amount must be greater than 0");
         return;
       }
 
-      if (this.action === "withdraw") {
-        const available =
-          this.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
-        const availableBigInt = BigInt(available || "0");
-        const requestedWei = this.amountToWei(this.value, this.unit);
-        const requestedBigInt = BigInt(requestedWei);
-
-        if (requestedBigInt > availableBigInt) {
-          ElMessage.warning(
-            `Insufficient available assets. Requested: ${this.value} ${this.unit}, Available: ${this.custodiedAmount} ${this.coin}`,
-          );
-          return;
-        }
-      }
-
-      this.submitting = true;
+      form.submitting = true;
       try {
-        const payload = {
-          asset: this.coin,
-          amount: this.value,
-          unit: this.unit,
-        };
-
-        let result;
-        if (this.action === "deposit") {
-          result = await deposit(payload);
-        } else {
-          result = await withdraw(payload);
-        }
+        const result = await deposit({
+          asset: form.coin,
+          amount: form.value,
+          unit: form.unit,
+        });
 
         const tip = result.approveTxHash
           ? `Approve: ${result.approveTxHash} | Tx: ${result.txHash}`
           : `Tx: ${result.txHash}`;
 
-        ElMessage.success(`${this.submitLabel} success. ${tip}`);
+        ElMessage.success(`Deposit success. ${tip}`);
 
         await this.refreshCustodiedShares();
         await this.refreshBalance();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
       } finally {
-        this.submitting = false;
+        form.submitting = false;
+      }
+    },
+
+    async onWithdraw() {
+      const form = this.withdrawForm;
+      if (form.submitting) {
+        return;
+      }
+
+      if (!form.value || Number(form.value) <= 0) {
+        ElMessage.warning("Amount must be greater than 0");
+        return;
+      }
+
+      const available =
+        form.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+      const requestedWei = this.amountToWei(form.value, form.unit);
+      if (BigInt(requestedWei) > BigInt(available || "0")) {
+        ElMessage.warning(
+          `Insufficient available assets. Available: ${this.selectedCustodied(form.coin)} ${form.coin}`,
+        );
+        return;
+      }
+
+      form.submitting = true;
+      try {
+        const result = await withdraw({
+          asset: form.coin,
+          amount: form.value,
+          unit: form.unit,
+        });
+
+        ElMessage.success(`Withdraw success. Tx: ${result.txHash}`);
+
+        await this.refreshCustodiedShares();
+        await this.refreshBalance();
+      } catch (err) {
+        ElMessage.error(this.getErrorMessage(err));
+      } finally {
+        form.submitting = false;
       }
     },
   },
@@ -283,7 +351,14 @@ export default {
 </script>
 
 <style scoped>
-.deposit-card {
+.actions-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.action-card {
   width: 100%;
 }
 
@@ -306,34 +381,20 @@ export default {
   width: 100%;
 }
 
-.submit-btn,
-.mini-btn {
+.submit-btn {
   background-color: transparent;
   color: black;
   border-color: rgb(200, 200, 200);
 }
 
-.submit-btn:hover,
-.mini-btn:hover {
+.submit-btn:hover {
   background-color: transparent;
   border-color: black;
   color: black;
 }
 
-.submit-btn:active,
-.mini-btn:active {
+.submit-btn:active {
   background-color: rgb(200, 200, 200);
-}
-
-.operation-tip {
-  margin-top: 12px;
-  padding: 8px 10px;
-  background: rgb(230, 245, 255);
-  border-left: 3px solid rgb(66, 133, 244);
-  border-radius: 2px;
-  font-size: 12px;
-  color: rgb(30, 80, 140);
-  line-height: 1.4;
 }
 
 .data-section {
