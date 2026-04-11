@@ -29,7 +29,11 @@
           placeholder="Alice price"
           style="flex: 1"
         />
-        <el-select v-model="alicePriceUnit" placeholder="Unit" style="width: 110px">
+        <el-select
+          v-model="alicePriceUnit"
+          placeholder="Unit"
+          style="width: 110px"
+        >
           <el-option label="Ether" value="ether" />
           <el-option label="Finney" value="finney" />
           <el-option label="Szabo" value="szabo" />
@@ -39,12 +43,12 @@
         <el-button type="primary" @click="setAlicePrice1">Set Alice</el-button>
       </div>
       <div style="display: flex; gap: 8px; align-items: center">
-        <el-input
-          v-model="bobPrice"
-          placeholder="Bob price"
-          style="flex: 1"
-        />
-        <el-select v-model="bobPriceUnit" placeholder="Unit" style="width: 110px">
+        <el-input v-model="bobPrice" placeholder="Bob price" style="flex: 1" />
+        <el-select
+          v-model="bobPriceUnit"
+          placeholder="Unit"
+          style="width: 110px"
+        >
           <el-option label="Ether" value="ether" />
           <el-option label="Finney" value="finney" />
           <el-option label="Szabo" value="szabo" />
@@ -56,9 +60,11 @@
     </div>
   </CardItem>
   <el-divider />
+  <el-button @click="getAlicePrice1">getAlicePrice</el-button>
+  <el-divider />
   <el-button @click="getBobPrice1">getBobPrice</el-button>
   <el-divider />
-  <el-button @click="getAlicePrice1">getAlicePrice</el-button>
+  <el-button @click="getHealthFactor1">getHealthFactor</el-button>
 </template>
 
 <script>
@@ -68,6 +74,7 @@ import {
   getAccountInfo,
   deposit,
   withdraw,
+  getHealthFactor,
 } from "@/contracts/lendingPool";
 
 import {
@@ -163,6 +170,10 @@ export default {
     },
     async getAlicePrice1() {
       alert(Web3.utils.fromWei(await getAlicePrice(), "ether"));
+    },
+
+    async getHealthFactor1() {
+      alert(Web3.utils.fromWei(await getHealthFactor(4), "ether"));
     },
   },
   components: {

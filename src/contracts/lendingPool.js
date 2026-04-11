@@ -296,47 +296,11 @@ export async function liquidate({
   };
 }
 
-export async function diagnosticCheck() {
-  console.log("🔍 启动诊断检查...");
+export async function getHealthFactor(debtVaultId) {
+  const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
 
-  try {
-    // 1. 检查连接
-    const accounts = await web3.eth.getAccounts();
-    console.log("✓ 账户:", accounts[0]);
-
-    // 2. 检查合约地址
-    console.log("✓ LendingPool 地址:", address);
-
-    // 3. 检查合约是否可访问
-    const code = await web3.eth.getCode(address);
-    if (code === "0x") {
-      console.error("❌ 错误：LendingPool 地址上没有合约代码");
-      return false;
-    }
-    console.log("✓ 合约代码存在");
-
-    // 4. 检查账户余额
-    const balance = await web3.eth.getBalance(accounts[0]);
-    console.log("✓ 账户余额:", web3.utils.fromWei(balance, "ether"), "ETH");
-
-    // 5. 尝试简单的 read-only 调用
-    try {
-      const reserves = await lendingPool.methods.getReserveAssets().call();
-      console.log("✓ getReserveAssets 可用，包含:", reserves.length, "个资产");
-    } catch (err) {
-      console.error("❌ getReserveAssets 失败:", err?.message);
-    }
-
-    // 6. 检查 ABI 中的方法
-    const methodNames = abi
-      .filter((item) => item.type === "function")
-      .map((item) => item.name);
-    console.log("✓ ABI 包含", methodNames.length, "个方法");
-
-    console.log("✅ 诊断完成");
-    return true;
-  } catch (err) {
-    console.error("❌ 诊断失败:", err);
-    return false;
-  }
+  const healthFactor = lendingPool.methods
+    .healthFactor(normalizedDebtVaultId)
+    .call();
+  return healthFactor;
 }

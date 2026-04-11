@@ -7,5 +7,6 @@
   "BobToken": "0x94099942864EA81cCF197E9D71ac53310b1468D8",
   "LendingPool": "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
   "DepositLogic": "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9",
-  "BorrowLogic": "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9"
+  "BorrowLogic": "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9",
+  "FlashLoanBot": "0x9a676e781a523b5d0c0e43731313a708cb607508"
 }

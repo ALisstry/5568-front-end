@@ -139,15 +139,6 @@
       </div>
 
       <el-form class="action-form" label-position="right" label-width="120px">
-        <el-form-item label="Flash Bot">
-          <el-input
-            v-model="flash.flashBotAddress"
-            placeholder="0x..."
-            clearable
-            style="--el-color-primary: black; --el-border-color-hover: gray"
-          ></el-input>
-        </el-form-item>
-
         <el-form-item label="DebtVault">
           <el-row style="width: 100%" :gutter="8">
             <el-col :span="14">
@@ -302,7 +293,6 @@ export default {
         submitting: false,
       },
       flash: {
-        flashBotAddress: "",
         debtVaultId: "",
         debtAsset: "Alice",
         collateralAsset: "Bob",
@@ -428,10 +418,6 @@ export default {
 
     async onFlashLiquidate() {
       if (this.flash.submitting) return;
-      if (!this.flash.flashBotAddress) {
-        ElMessage.warning("Flash bot contract address is required");
-        return;
-      }
       if (!this.flash.debtVaultId) {
         ElMessage.warning("DebtVault ID is required");
         return;
@@ -444,7 +430,6 @@ export default {
       this.flash.submitting = true;
       try {
         const result = await flashLiquidate({
-          flashBotAddress: this.flash.flashBotAddress,
           debtVaultId: this.flash.debtVaultId,
           debtAsset: this.flash.debtAsset,
           collateralAsset: this.flash.collateralAsset,
@@ -492,15 +477,18 @@ export default {
 
 <style scoped>
 .container {
-  margin: 10px;
+  margin: 10px auto;
+  padding: 0 10px;
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  max-width: 100%;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
 }
 
 .liquidation-card {
   width: 100%;
+  box-sizing: border-box;
 }
 
 .card-header {

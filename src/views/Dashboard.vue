@@ -378,27 +378,27 @@ export default {
           </div>
           <div class="metric-item">
             <span class="metric-label">Alice Balance</span>
-            <span class="metric-value">{{
-              formatUnits(aliceBalanceRaw, aliceDecimals)
-            }}</span>
+            <span class="metric-value"
+              >${{ formatUnits(aliceBalanceRaw, aliceDecimals) }}</span
+            >
           </div>
           <div class="metric-item">
             <span class="metric-label">Bob Balance</span>
-            <span class="metric-value">{{
-              formatUnits(bobBalanceRaw, bobDecimals)
-            }}</span>
+            <span class="metric-value"
+              >${{ formatUnits(bobBalanceRaw, bobDecimals) }}</span
+            >
           </div>
           <div class="metric-item">
             <span class="metric-label">Total Deposits Value</span>
-            <span class="metric-value">{{
-              formatUnits(totalDepositValueWei)
-            }}</span>
+            <span class="metric-value"
+              >${{ formatUnits(totalDepositValueWei) }}</span
+            >
           </div>
           <div class="metric-item">
             <span class="metric-label">Total Borrowed Value</span>
-            <span class="metric-value">{{
-              formatUnits(totalBorrowValueWei)
-            }}</span>
+            <span class="metric-value"
+              >${{ formatUnits(totalBorrowValueWei) }}</span
+            >
           </div>
         </div>
 

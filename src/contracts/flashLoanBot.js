@@ -1,6 +1,8 @@
 import flashLoanBotAbi from "../ABI/FlashLoanBot.json" with { type: "json" };
 import { web3 } from "./wallet.js";
 import { resolveAssetAddress } from "./erc20.js";
+import addressJson from "./address.json" with { type: "json" };
+const FlashLoanBotAddress = addressJson.FlashLoanBot;
 
 async function getDefaultAccount() {
   const accounts = await web3.eth.getAccounts();
@@ -39,24 +41,19 @@ function normalizeDebtVaultId(debtVaultId) {
 }
 
 export async function flashLiquidate({
-  flashBotAddress,
   debtVaultId,
   debtAsset,
   collateralAsset,
   amount,
   unit = "ether",
 }) {
-  if (!web3.utils.isAddress(flashBotAddress)) {
-    throw new Error("Invalid flash bot address");
-  }
-
   const defaultAccount = await getDefaultAccount();
   const normalizedDebtVaultId = normalizeDebtVaultId(debtVaultId);
   const assetAddress = resolveAssetAddress(debtAsset);
   const collateralAddress = resolveAssetAddress(collateralAsset);
   const amountWei = toWeiAmount(amount, unit);
 
-  const contract = new web3.eth.Contract(flashLoanBotAbi, flashBotAddress);
+  const contract = new web3.eth.Contract(flashLoanBotAbi, FlashLoanBotAddress);
   const receipt = await contract.methods
     .borrow(assetAddress, amountWei, normalizedDebtVaultId, collateralAddress)
     .send({ from: defaultAccount });
