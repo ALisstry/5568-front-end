@@ -41,6 +41,11 @@ export default {
       depositRows: [],
       borrowRows: [],
       debtVaults: [],
+      reserveStatusRows: [],
+
+      poolOracle: "",
+      poolLiquidationBonusBps: "0",
+      poolNextDebtVaultId: "0",
 
       tokenMetaByAddress: {},
 
@@ -128,6 +133,34 @@ export default {
       return `${whole.toString()}.${fractionText}`;
     },
 
+    formatRayPercent(rayValue, fractionDigits = 2) {
+      try {
+        const value = BigInt(String(rayValue ?? "0"));
+        if (value <= 0n) return "0";
+
+        const digits = Math.max(0, Number(fractionDigits) || 0);
+        const scale = 10n ** BigInt(digits);
+        const scaledPercent =
+          (value * 100n * scale) / 1_000_000_000_000_000_000n;
+        const whole = scaledPercent / scale;
+        const fraction = scaledPercent % scale;
+        const fractionText = digits
+          ? fraction.toString().padStart(digits, "0").replace(/0+$/, "")
+          : "";
+
+        return fractionText
+          ? `${whole.toString()}.${fractionText}`
+          : whole.toString();
+      } catch {
+        return "0";
+      }
+    },
+
+    formatBpsPercent(bpsValue) {
+      const value = Number(bpsValue ?? 0);
+      if (!Number.isFinite(value) || value <= 0) return "0";
+      return (value / 100).toFixed(2).replace(/\.?0+$/, "");
+    },
     toPercentFromRay(rayValue) {
       try {
         const value = BigInt(String(rayValue ?? "0"));
@@ -202,7 +235,11 @@ export default {
           this.depositRows = [];
           this.borrowRows = [];
           this.debtVaults = [];
+          this.reserveStatusRows = [];
           this.healthFactorPercent = 200;
+          this.poolOracle = "";
+          this.poolLiquidationBonusBps = "0";
+          this.poolNextDebtVaultId = "0";
           this.error = "Please connect MetaMask first";
           return;
         }
@@ -241,6 +278,17 @@ export default {
         const reserveAssets = await lendingPool.methods
           .getReserveAssets()
           .call();
+        const [poolOracle, liquidationBonusBps, nextDebtVaultId] =
+          await Promise.all([
+            lendingPool.methods.oracle().call(),
+            lendingPool.methods.liquidationBonus().call(),
+            lendingPool.methods.nextDebtVaultId().call(),
+          ]);
+
+        this.poolOracle = String(poolOracle || "");
+        this.poolLiquidationBonusBps = String(liquidationBonusBps || "0");
+        this.poolNextDebtVaultId = String(nextDebtVaultId || "0");
+
         const debtVaultIds = await lendingPool.methods
           .getOwnerDebtVaultIds(this.account)
           .call();
@@ -259,6 +307,25 @@ export default {
         }
 
         this.tokenMetaByAddress = metaByAddress;
+
+        this.reserveStatusRows = await Promise.all(
+          reserveAssets.map(async (assetAddress) => {
+            const [utilizationRaw, aTokenAddress] = await Promise.all([
+              lendingPool.methods.getReserveUtilization(assetAddress).call(),
+              lendingPool.methods.getReserveAToken(assetAddress).call(),
+            ]);
+            const meta = metaByAddress[assetAddress.toLowerCase()] || {
+              symbol: this.shortAddress(assetAddress),
+            };
+
+            return {
+              assetAddress,
+              symbol: meta.symbol,
+              utilizationRaw: String(utilizationRaw || "0"),
+              aTokenAddress: String(aTokenAddress || ""),
+            };
+          }),
+        );
 
         const reserveRows = await Promise.all(
           reserveAssets.map(async (assetAddress) => {
@@ -409,6 +476,46 @@ export default {
 
     <section class="main-content">
       <div class="assets-section">
+        <CardItem class="list-card pool-card">
+          <h3 class="card-title">Lending Pool</h3>
+          <div class="metrics-grid pool-metrics-grid">
+            <div class="metric-item">
+              <span class="metric-label">Reserves</span>
+              <span class="metric-value">{{ reserveStatusRows.length }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Next DebtVault ID</span>
+              <span class="metric-value">{{ poolNextDebtVaultId || "-" }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Liquidation Bonus</span>
+              <span class="metric-value"
+                >{{ formatBpsPercent(poolLiquidationBonusBps) }}%</span
+              >
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Oracle</span>
+              <span class="metric-value">{{
+                poolOracle ? shortAddress(poolOracle) : "-"
+              }}</span>
+            </div>
+          </div>
+
+          <p v-if="!reserveStatusRows.length" class="line">No reserve assets</p>
+          <div
+            v-for="row in reserveStatusRows"
+            :key="row.assetAddress"
+            class="asset-row"
+          >
+            <p class="line">
+              {{ row.symbol }}: {{ formatRayPercent(row.utilizationRaw) }}%
+            </p>
+            <p class="sub-line">
+              aToken:
+              {{ row.aTokenAddress ? shortAddress(row.aTokenAddress) : "-" }}
+            </p>
+          </div>
+        </CardItem>
         <CardItem class="list-card">
           <h3 class="card-title">Deposits</h3>
           <p v-if="!depositRows.length" class="line">No deposited assets</p>
@@ -563,7 +670,14 @@ export default {
 .top-section :deep(.card-item),
 .assets-section :deep(.card-item) {
   margin: 0;
+}
+
+.top-section :deep(.card-item) {
   height: 100%;
+}
+
+.assets-section :deep(.card-item) {
+  height: auto;
 }
 
 .overview-card,
@@ -571,7 +685,15 @@ export default {
 .vault-card {
   min-width: 0;
   margin: 0;
-  margin-top: 20px;
+  margin-top: 0px;
+}
+
+.pool-card {
+  grid-column: 1 / -1;
+}
+
+.pool-metrics-grid {
+  margin-bottom: 8px;
 }
 
 .card-head {
