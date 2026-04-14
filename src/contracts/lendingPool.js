@@ -98,6 +98,32 @@ export async function getReserveAssetsWithConfig() {
   }
 }
 
+export async function getUserClaimableAssetAmount(userAddress, assetAddress) {
+  const user = userAddress || (await getDefaultAccount());
+  try {
+    const selector = {
+      name: "getUserClaimableAssetAmount",
+      type: "function",
+      inputs: [
+        { type: "address", name: "user" },
+        { type: "address", name: "asset" },
+      ],
+    };
+    const data = web3.eth.abi.encodeFunctionCall(selector, [user, assetAddress]);
+    const result = await web3.eth.call({ to: address, data });
+    return String(web3.eth.abi.decodeParameter("uint256", result));
+  } catch (err) {
+    try {
+      const fallbackShares = await lendingPool.methods
+        .getUserClaimableShares(user, assetAddress)
+        .call();
+      return String(fallbackShares);
+    } catch {
+      console.error("Failed to get claimable asset amount:", err);
+      return "0";
+    }
+  }
+}
 export async function getUserCustodiedShares(userAddress, assetAddress) {
   const user = userAddress || (await getDefaultAccount());
   try {
@@ -304,3 +330,4 @@ export async function getHealthFactor(debtVaultId) {
     .call();
   return healthFactor;
 }
+

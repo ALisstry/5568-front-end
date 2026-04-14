@@ -96,7 +96,7 @@
 
         <el-form-item label="Amount">
           <el-row style="width: 100%" :gutter="8">
-            <el-col :span="15">
+            <el-col :span="12">
               <el-input
                 v-model="withdrawForm.value"
                 placeholder="Input token amount"
@@ -104,7 +104,12 @@
                 style="--el-color-primary: black; --el-border-color-hover: gray"
               ></el-input>
             </el-col>
-            <el-col :span="9">
+            <el-col :span="6">
+              <el-button class="max-btn full-width" plain @click="fillWithdrawMax"
+                >Max</el-button
+              >
+            </el-col>
+            <el-col :span="6">
               <el-select
                 v-model="withdrawForm.unit"
                 class="full-width"
@@ -137,9 +142,9 @@
       </el-form>
 
       <div class="data-section">
-        <p class="data-label">Available (Pool Custody)</p>
+        <p class="data-label">Claimable (Available to Withdraw)</p>
         <p class="data-value">
-          {{ selectedCustodied(withdrawForm.coin) }} {{ withdrawForm.coin }}
+          {{ selectedClaimable(withdrawForm.coin) }} {{ withdrawForm.coin }}
         </p>
       </div>
     </CardItem>
@@ -153,7 +158,7 @@ import erc20Abi from "../ABI/AliceToken.json" with { type: "json" };
 import addressJson from "@/contracts/address.json" with { type: "json" };
 import {
   deposit,
-  getUserCustodiedShares,
+  getUserClaimableAssetAmount,
   withdraw,
 } from "@/contracts/lendingPool";
 import { resolveAssetAddress } from "@/contracts/erc20";
@@ -178,23 +183,38 @@ export default {
         unit: "ether",
         submitting: false,
       },
-      custodiedAlice: "0",
-      custodiedBob: "0",
+      claimableAlice: "0",
+      claimableBob: "0",
       balanceAlice: "0",
       balanceBob: "0",
     };
   },
   async mounted() {
-    await this.refreshCustodiedShares();
+    await this.refreshClaimableAssets();
     await this.refreshBalance();
   },
   methods: {
-    selectedCustodied(coin) {
-      const raw = coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+    selectedClaimable(coin) {
+      const raw = coin === "Alice" ? this.claimableAlice : this.claimableBob;
       try {
         return web3.utils.fromWei(raw, "ether");
       } catch {
         return "0";
+      }
+    },
+    getSelectedClaimableRaw(coin) {
+      return coin === "Alice" ? this.claimableAlice : this.claimableBob;
+    },
+
+    fillWithdrawMax() {
+      try {
+        const raw = this.getSelectedClaimableRaw(this.withdrawForm.coin);
+        this.withdrawForm.value = web3.utils.fromWei(
+          String(raw || "0"),
+          this.withdrawForm.unit,
+        );
+      } catch {
+        this.withdrawForm.value = "0";
       }
     },
 
@@ -207,20 +227,20 @@ export default {
       }
     },
 
-    async refreshCustodiedShares() {
+    async refreshClaimableAssets() {
       try {
         const aliceAddr = resolveAssetAddress("Alice");
         const bobAddr = resolveAssetAddress("Bob");
 
         const [aliceShares, bobShares] = await Promise.all([
-          getUserCustodiedShares(undefined, aliceAddr),
-          getUserCustodiedShares(undefined, bobAddr),
+          getUserClaimableAssetAmount(undefined, aliceAddr),
+          getUserClaimableAssetAmount(undefined, bobAddr),
         ]);
 
-        this.custodiedAlice = aliceShares;
-        this.custodiedBob = bobShares;
+        this.claimableAlice = aliceShares;
+        this.claimableBob = bobShares;
       } catch (err) {
-        console.error("Failed to refresh custodied shares:", err);
+        console.error("Failed to refresh claimable assets:", err);
       }
     },
 
@@ -297,7 +317,7 @@ export default {
 
         ElMessage.success(`Deposit success. ${tip}`);
 
-        await this.refreshCustodiedShares();
+        await this.refreshClaimableAssets();
         await this.refreshBalance();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
@@ -318,11 +338,11 @@ export default {
       }
 
       const available =
-        form.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+        form.coin === "Alice" ? this.claimableAlice : this.claimableBob;
       const requestedWei = this.amountToWei(form.value, form.unit);
       if (BigInt(requestedWei) > BigInt(available || "0")) {
         ElMessage.warning(
-          `Insufficient available assets. Available: ${this.selectedCustodied(form.coin)} ${form.coin}`,
+          `Insufficient claimable assets. Available: ${this.selectedClaimable(form.coin)} ${form.coin}`,
         );
         return;
       }
@@ -337,7 +357,7 @@ export default {
 
         ElMessage.success(`Withdraw success. Tx: ${result.txHash}`);
 
-        await this.refreshCustodiedShares();
+        await this.refreshClaimableAssets();
         await this.refreshBalance();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
@@ -397,6 +417,17 @@ export default {
   background-color: rgb(200, 200, 200);
 }
 
+.max-btn {
+  background-color: transparent;
+  color: black;
+  border-color: rgb(200, 200, 200);
+}
+
+.max-btn:hover {
+  border-color: black;
+  color: black;
+}
+
 .data-section {
   margin-top: 16px;
   padding-top: 12px;
@@ -417,3 +448,8 @@ export default {
   color: rgb(30, 30, 30);
 }
 </style>
+
+
+
+
+
