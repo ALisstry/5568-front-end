@@ -1,13 +1,13 @@
 import addressJson from "./address.json" with { type: "json" };
 import abi from "../ABI/LendingPool.json" with { type: "json" };
-import { web3 } from "./wallet.js";
+import { getConnectedAccounts, web3 } from "./wallet.js";
 import { approveIfNeeded, resolveAssetAddress } from "./erc20.js";
 
 const address = addressJson.LendingPool;
 const lendingPool = new web3.eth.Contract(abi, address);
 
 async function getDefaultAccount() {
-  const accounts = await web3.eth.getAccounts();
+  const accounts = await getConnectedAccounts();
   if (!accounts || accounts.length === 0) {
     throw new Error("MetaMask account is not connected");
   }
@@ -101,27 +101,13 @@ export async function getReserveAssetsWithConfig() {
 export async function getUserClaimableAssetAmount(userAddress, assetAddress) {
   const user = userAddress || (await getDefaultAccount());
   try {
-    const selector = {
-      name: "getUserClaimableAssetAmount",
-      type: "function",
-      inputs: [
-        { type: "address", name: "user" },
-        { type: "address", name: "asset" },
-      ],
-    };
-    const data = web3.eth.abi.encodeFunctionCall(selector, [user, assetAddress]);
-    const result = await web3.eth.call({ to: address, data });
-    return String(web3.eth.abi.decodeParameter("uint256", result));
+    const amount = await lendingPool.methods
+      .getUserClaimableAssetAmount(user, assetAddress)
+      .call();
+    return String(amount);
   } catch (err) {
-    try {
-      const fallbackShares = await lendingPool.methods
-        .getUserClaimableShares(user, assetAddress)
-        .call();
-      return String(fallbackShares);
-    } catch {
-      console.error("Failed to get claimable asset amount:", err);
-      return "0";
-    }
+    console.error("Failed to get claimable asset amount:", err);
+    return "0";
   }
 }
 export async function getUserCustodiedShares(userAddress, assetAddress) {

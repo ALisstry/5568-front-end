@@ -3,7 +3,12 @@ import CardItem from "@/components/CardItem.vue";
 import lendingPoolAbi from "@/ABI/LendingPool.json" with { type: "json" };
 import erc20Abi from "@/ABI/AliceToken.json" with { type: "json" };
 import addressJson from "@/contracts/address.json" with { type: "json" };
-import { web3 } from "@/contracts/wallet";
+import {
+  getConnectedAccounts,
+  provider,
+  WALLET_CONNECTED_EVENT,
+  web3,
+} from "@/contracts/wallet";
 
 const ORACLE_ABI = [
   {
@@ -50,6 +55,8 @@ export default {
       tokenMetaByAddress: {},
 
       onAccountsChanged: null,
+      onChainChanged: null,
+      onWalletConnected: null,
     };
   },
   computed: {
@@ -78,16 +85,38 @@ export default {
   mounted() {
     this.refreshDashboard();
 
-    if (window.ethereum) {
-      this.onAccountsChanged = () => {
-        this.refreshDashboard();
-      };
-      window.ethereum.on("accountsChanged", this.onAccountsChanged);
+    this.onAccountsChanged = () => {
+      this.refreshDashboard();
+    };
+    this.onChainChanged = () => {
+      this.refreshDashboard();
+    };
+    this.onWalletConnected = () => {
+      this.refreshDashboard();
+    };
+
+    if (typeof provider?.on === "function") {
+      provider.on("accountsChanged", this.onAccountsChanged);
+      provider.on("chainChanged", this.onChainChanged);
     }
+
+    window.addEventListener(WALLET_CONNECTED_EVENT, this.onWalletConnected);
   },
   beforeUnmount() {
-    if (window.ethereum && this.onAccountsChanged) {
-      window.ethereum.removeListener("accountsChanged", this.onAccountsChanged);
+    if (typeof provider?.removeListener === "function") {
+      if (this.onAccountsChanged) {
+        provider.removeListener("accountsChanged", this.onAccountsChanged);
+      }
+      if (this.onChainChanged) {
+        provider.removeListener("chainChanged", this.onChainChanged);
+      }
+    }
+
+    if (this.onWalletConnected) {
+      window.removeEventListener(
+        WALLET_CONNECTED_EVENT,
+        this.onWalletConnected,
+      );
     }
   },
   methods: {
@@ -227,7 +256,7 @@ export default {
       this.error = "";
 
       try {
-        const accounts = await web3.eth.getAccounts();
+        const accounts = await getConnectedAccounts();
         if (!accounts || accounts.length === 0) {
           this.account = "";
           this.totalDepositValueWei = "0";
@@ -250,7 +279,6 @@ export default {
           lendingPoolAbi,
           addressJson.LendingPool,
         );
-        const oracle = new web3.eth.Contract(ORACLE_ABI, addressJson.Oracle);
 
         const aliceToken = new web3.eth.Contract(
           erc20Abi,
@@ -288,6 +316,11 @@ export default {
         this.poolOracle = String(poolOracle || "");
         this.poolLiquidationBonusBps = String(liquidationBonusBps || "0");
         this.poolNextDebtVaultId = String(nextDebtVaultId || "0");
+
+        const oracle = new web3.eth.Contract(
+          ORACLE_ABI,
+          poolOracle || addressJson.Oracle,
+        );
 
         const debtVaultIds = await lendingPool.methods
           .getOwnerDebtVaultIds(this.account)

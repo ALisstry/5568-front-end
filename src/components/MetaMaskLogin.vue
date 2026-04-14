@@ -24,6 +24,11 @@
 
 <script>
 import { connect } from "@/contracts/login";
+import {
+  getConnectedAccounts,
+  provider,
+  WALLET_CONNECTED_EVENT,
+} from "@/contracts/wallet";
 
 export default {
   name: "MetaMaskLogin",
@@ -34,6 +39,9 @@ export default {
       error: "",
       provider: null,
       chainId: "",
+      onAccountsChanged: null,
+      onChainChanged: null,
+      onWalletConnected: null,
     };
   },
   computed: {
@@ -43,33 +51,63 @@ export default {
     },
   },
   mounted() {
-    // 自动登录
-    this.login();
+    this.syncWalletState();
 
-    // 监听账户变化
-    if (window.ethereum) {
-      window.ethereum.on("accountsChanged", (accounts) => {
-        if (accounts.length === 0) {
-          this.address = "";
-        } else {
-          this.address = accounts[0];
-        }
-      });
+    this.onAccountsChanged = (accounts) => {
+      this.address = Array.isArray(accounts) && accounts.length ? accounts[0] : "";
+      if (!this.address) {
+        this.error = "";
+      }
+    };
+    this.onChainChanged = (newChainId) => {
+      this.chainId = String(newChainId || "");
+    };
+    this.onWalletConnected = async (event) => {
+      if (event?.detail?.address) {
+        this.address = event.detail.address;
+      } else {
+        await this.syncWalletState();
+      }
 
-      // 监听链变化
-      window.ethereum.on("chainChanged", (newChainId) => {
-        this.chainId = parseInt(newChainId).toString(16);
-      });
+      if (event?.detail?.chainId) {
+        this.chainId = String(event.detail.chainId);
+      }
+      this.error = "";
+    };
+
+    if (typeof provider?.on === "function") {
+      provider.on("accountsChanged", this.onAccountsChanged);
+      provider.on("chainChanged", this.onChainChanged);
     }
+
+    window.addEventListener(WALLET_CONNECTED_EVENT, this.onWalletConnected);
   },
   beforeUnmount() {
-    // 移除监听器
-    if (window.ethereum) {
-      window.ethereum.removeAllListeners("accountsChanged");
-      window.ethereum.removeAllListeners("chainChanged");
+    if (typeof provider?.removeListener === "function") {
+      if (this.onAccountsChanged) {
+        provider.removeListener("accountsChanged", this.onAccountsChanged);
+      }
+      if (this.onChainChanged) {
+        provider.removeListener("chainChanged", this.onChainChanged);
+      }
+    }
+
+    if (this.onWalletConnected) {
+      window.removeEventListener(
+        WALLET_CONNECTED_EVENT,
+        this.onWalletConnected,
+      );
     }
   },
   methods: {
+    async syncWalletState() {
+      try {
+        const accounts = await getConnectedAccounts();
+        this.address = accounts.length ? accounts[0] : "";
+      } catch (err) {
+        console.error("Failed to sync wallet state:", err);
+      }
+    },
     async login() {
       if (this.loading) {
         return;
@@ -81,7 +119,7 @@ export default {
 
         const result = await connect();
         this.address = result.address;
-        this.chainId = result.chainId;
+        this.chainId = String(result.chainId || "");
       } catch (err) {
         this.error = err.message || "Connection failed";
         console.error("MetaMask connection error:", err);

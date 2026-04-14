@@ -105,7 +105,10 @@
               ></el-input>
             </el-col>
             <el-col :span="6">
-              <el-button class="max-btn full-width" plain @click="fillWithdrawMax"
+              <el-button
+                class="max-btn full-width"
+                plain
+                @click="fillWithdrawMax"
                 >Max</el-button
               >
             </el-col>
@@ -162,7 +165,12 @@ import {
   withdraw,
 } from "@/contracts/lendingPool";
 import { resolveAssetAddress } from "@/contracts/erc20";
-import { web3 } from "@/contracts/wallet";
+import {
+  getConnectedAccounts,
+  provider,
+  WALLET_CONNECTED_EVENT,
+  web3,
+} from "@/contracts/wallet";
 
 export default {
   name: "DepositActions",
@@ -187,13 +195,52 @@ export default {
       claimableBob: "0",
       balanceAlice: "0",
       balanceBob: "0",
+      onAccountsChanged: null,
+      onChainChanged: null,
+      onWalletConnected: null,
     };
   },
   async mounted() {
-    await this.refreshClaimableAssets();
-    await this.refreshBalance();
+    await this.refreshWalletData();
+
+    this.onAccountsChanged = async () => {
+      await this.refreshWalletData();
+    };
+    this.onChainChanged = async () => {
+      await this.refreshWalletData();
+    };
+    this.onWalletConnected = async () => {
+      await this.refreshWalletData();
+    };
+
+    if (typeof provider?.on === "function") {
+      provider.on("accountsChanged", this.onAccountsChanged);
+      provider.on("chainChanged", this.onChainChanged);
+    }
+
+    window.addEventListener(WALLET_CONNECTED_EVENT, this.onWalletConnected);
+  },
+  beforeUnmount() {
+    if (typeof provider?.removeListener === "function") {
+      if (this.onAccountsChanged) {
+        provider.removeListener("accountsChanged", this.onAccountsChanged);
+      }
+      if (this.onChainChanged) {
+        provider.removeListener("chainChanged", this.onChainChanged);
+      }
+    }
+
+    if (this.onWalletConnected) {
+      window.removeEventListener(
+        WALLET_CONNECTED_EVENT,
+        this.onWalletConnected,
+      );
+    }
   },
   methods: {
+    async refreshWalletData() {
+      await Promise.all([this.refreshClaimableAssets(), this.refreshBalance()]);
+    },
     selectedClaimable(coin) {
       const raw = coin === "Alice" ? this.claimableAlice : this.claimableBob;
       try {
@@ -231,10 +278,17 @@ export default {
       try {
         const aliceAddr = resolveAssetAddress("Alice");
         const bobAddr = resolveAssetAddress("Bob");
+        const accounts = await getConnectedAccounts();
+
+        if (!accounts || accounts.length === 0) {
+          this.claimableAlice = "0";
+          this.claimableBob = "0";
+          return;
+        }
 
         const [aliceShares, bobShares] = await Promise.all([
-          getUserClaimableAssetAmount(undefined, aliceAddr),
-          getUserClaimableAssetAmount(undefined, bobAddr),
+          getUserClaimableAssetAmount(accounts[0], aliceAddr),
+          getUserClaimableAssetAmount(accounts[0], bobAddr),
         ]);
 
         this.claimableAlice = aliceShares;
@@ -246,8 +300,12 @@ export default {
 
     async refreshBalance() {
       try {
-        const accounts = await web3.eth.getAccounts();
-        if (!accounts || accounts.length === 0) return;
+        const accounts = await getConnectedAccounts();
+        if (!accounts || accounts.length === 0) {
+          this.balanceAlice = "0";
+          this.balanceBob = "0";
+          return;
+        }
 
         const aliceToken = new web3.eth.Contract(
           erc20Abi,
@@ -448,8 +506,3 @@ export default {
   color: rgb(30, 30, 30);
 }
 </style>
-
-
-
-
-

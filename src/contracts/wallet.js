@@ -1,5 +1,7 @@
 import { createEVMClient, getInfuraRpcUrls } from "@metamask/connect-evm";
 import Web3 from "web3";
+
+export const WALLET_CONNECTED_EVENT = "wallet:connected";
 export const evmClient = await createEVMClient({
   dapp: {
     name: "5568 Project",
@@ -17,3 +19,33 @@ export const evmClient = await createEVMClient({
 
 export const provider = evmClient.getProvider();
 export const web3 = new Web3(provider);
+
+export async function getConnectedAccounts() {
+  try {
+    const accounts = await web3.eth.getAccounts();
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      return accounts;
+    }
+  } catch {}
+
+  if (typeof provider?.request === "function") {
+    try {
+      const accounts = await provider.request({ method: "eth_accounts" });
+      return Array.isArray(accounts) ? accounts : [];
+    } catch {}
+  }
+
+  return [];
+}
+
+export function notifyWalletConnected(detail) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(WALLET_CONNECTED_EVENT, {
+      detail,
+    }),
+  );
+}
