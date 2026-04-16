@@ -368,18 +368,25 @@ export default {
               decimals: 18,
             };
 
-            const [custodiedRaw, debtRaw, priceRay] = await Promise.all([
-              lendingPool.methods
-                .getUserCustodiedShares(this.account, assetAddress)
-                .call(),
-              lendingPool.methods
-                .getUserDebtBalance(this.account, assetAddress)
-                .call(),
-              this.safeGetPrice(oracle, assetAddress),
-            ]);
+            const [depositRaw, claimableRaw, lockedRaw, debtRaw, priceRay] =
+              await Promise.all([
+                lendingPool.methods
+                  .getUserTotalDepositAssetAmount(this.account, assetAddress)
+                  .call(),
+                lendingPool.methods
+                  .getUserClaimableAssetAmount(this.account, assetAddress)
+                  .call(),
+                lendingPool.methods
+                  .getUserLockedAssetAmount(this.account, assetAddress)
+                  .call(),
+                lendingPool.methods
+                  .getUserDebtBalance(this.account, assetAddress)
+                  .call(),
+                this.safeGetPrice(oracle, assetAddress),
+              ]);
 
             const depositValueWei = this.valueInWei(
-              custodiedRaw,
+              depositRaw,
               priceRay,
               meta.decimals,
             );
@@ -393,7 +400,9 @@ export default {
               assetAddress,
               symbol: meta.symbol,
               decimals: meta.decimals,
-              depositRaw: String(custodiedRaw),
+              depositRaw: String(depositRaw),
+              claimableRaw: String(claimableRaw),
+              lockedRaw: String(lockedRaw),
               debtRaw: String(debtRaw),
               depositValueWei: depositValueWei.toString(),
               debtValueWei: debtValueWei.toString(),
@@ -561,6 +570,13 @@ export default {
               {{ row.symbol }}: {{ formatUnits(row.depositRaw, row.decimals) }}
             </p>
             <p class="sub-line">
+              Claimable:
+              {{ formatUnits(row.claimableRaw, row.decimals) }}
+            </p>
+            <p class="sub-line">
+              Locked: {{ formatUnits(row.lockedRaw, row.decimals) }}
+            </p>
+            <p class="sub-line">
               Value: {{ formatUnits(row.depositValueWei) }}
             </p>
           </div>
@@ -646,7 +662,8 @@ export default {
           </div>
           <div class="vault-details">
             <p class="sub-line">
-              Collateral Value: {{ formatUnits(vault.collateralValueWei) }}
+              Liquidation Threshold Value:
+              {{ formatUnits(vault.collateralValueWei) }}
             </p>
             <p class="sub-line">
               Debt Value: {{ formatUnits(vault.debtValueWei) }}
