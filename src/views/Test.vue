@@ -65,6 +65,10 @@
   <el-button @click="getBobPrice1">getBobPrice</el-button>
   <el-divider />
   <el-button @click="getHealthFactor1">getHealthFactor</el-button>
+  <el-divider />
+  <el-button @click="getDebtVaultCollateralAssets1"
+    >getDebtVaultCollateralAssets</el-button
+  >
 </template>
 
 <script>
@@ -75,6 +79,7 @@ import {
   deposit,
   withdraw,
   getHealthFactor,
+  getDebtVaultCollateralAssets,
 } from "@/contracts/lendingPool";
 
 import {
@@ -174,6 +179,10 @@ export default {
 
     async getHealthFactor1() {
       alert(Web3.utils.fromWei(await getHealthFactor(4), "ether"));
+    },
+
+    async getDebtVaultCollateralAssets1() {
+      alert(await getDebtVaultCollateralAssets(3));
     },
   },
   components: {

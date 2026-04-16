@@ -330,3 +330,9 @@ export async function getHealthFactor(debtVaultId) {
   return healthFactor;
 }
 
+export async function getDebtVaultCollateralAssets(debtVaultId) {
+  const result = lendingPool.methods
+    .getDebtVaultCollateralAssets(debtVaultId)
+    .call();
+  return result;
+}

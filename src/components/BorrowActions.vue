@@ -46,28 +46,64 @@
       </el-form-item>
     </el-form>
 
-    <div class="data-section" v-if="selectedVaultData">
-      <div class="data-item">
-        <p class="data-label">Max Borrowable</p>
-        <p class="data-value">${{ remainingBorrowable() }}</p>
+    <div class="vault-info-section" v-if="selectedVaultData">
+      <div class="vault-summary">
+        <div class="summary-item">
+          <p class="summary-label">Max Borrowable</p>
+          <p class="summary-value">${{ remainingBorrowable() }}</p>
+        </div>
+        <div class="summary-item">
+          <p class="summary-label">Debt Value</p>
+          <p class="summary-value">
+            ${{ formatWei(selectedVaultData.debtValueRaw) }}
+          </p>
+        </div>
       </div>
-      <div class="data-item">
-        <p class="data-label">Debt Value</p>
-        <p class="data-value">
-          ${{ formatWei(selectedVaultData.debtValueRaw) }}
-        </p>
-      </div>
-      <div class="data-item">
-        <p class="data-label">Alice Collateral</p>
-        <p class="data-value">
-          ${{ formatWei(selectedVaultData.collateralAliceRaw) }}
-        </p>
-      </div>
-      <div class="data-item">
-        <p class="data-label">Bob Collateral</p>
-        <p class="data-value">
-          ${{ formatWei(selectedVaultData.collateralBobRaw) }}
-        </p>
+
+      <div class="assets-container">
+        <div class="assets-column collateral-column">
+          <h4 class="column-title">Collateral</h4>
+          <div
+            v-if="
+              selectedVaultData.collateralAssets &&
+              selectedVaultData.collateralAssets.length > 0
+            "
+            class="assets-list"
+          >
+            <div
+              v-for="asset in selectedVaultData.collateralAssets"
+              :key="asset.address"
+              class="asset-row"
+            >
+              <div class="asset-name">{{ asset.name }}</div>
+              <div class="asset-amount">{{ asset.formattedAmount }}</div>
+              <div class="asset-price">${{ asset.formattedPrice }}</div>
+            </div>
+          </div>
+          <div v-else class="no-assets">No collateral</div>
+        </div>
+
+        <div class="assets-column borrowed-column">
+          <h4 class="column-title">Borrowed</h4>
+          <div
+            v-if="
+              selectedVaultData.borrowedAssets &&
+              selectedVaultData.borrowedAssets.length > 0
+            "
+            class="assets-list"
+          >
+            <div
+              v-for="asset in selectedVaultData.borrowedAssets"
+              :key="asset.address"
+              class="asset-row"
+            >
+              <div class="asset-name">{{ asset.name }}</div>
+              <div class="asset-amount">{{ asset.formattedAmount }}</div>
+              <div class="asset-price">${{ asset.formattedPrice }}</div>
+            </div>
+          </div>
+          <div v-else class="no-assets">No borrowing</div>
+        </div>
       </div>
     </div>
   </CardItem>
@@ -366,6 +402,7 @@
 import { ElMessage } from "element-plus";
 import CardItem from "@/components/CardItem.vue";
 import lendingPoolAbi from "../ABI/LendingPool.json" with { type: "json" };
+import oracleAbi from "../ABI/SimpleOracle.json" with { type: "json" };
 import addressJson from "@/contracts/address.json" with { type: "json" };
 import {
   borrow,
@@ -419,6 +456,8 @@ export default {
       debtAlice: "0",
       debtBob: "0",
       vaultDataCache: {},
+      assetNameMap: {},
+      oracleAddress: "",
     };
   },
   computed: {
@@ -439,6 +478,14 @@ export default {
     await this.refreshDebtBalance();
   },
   methods: {
+    getAssetName(address) {
+      if (!address) return "Unknown";
+      const lowerAddr = address.toLowerCase();
+      if (lowerAddr === addressJson.AliceToken.toLowerCase()) return "Alice";
+      if (lowerAddr === addressJson.BobToken.toLowerCase()) return "Bob";
+      return "Unknown";
+    },
+
     formatWei(raw) {
       try {
         return web3.utils.fromWei(String(raw || "0"), "ether");
@@ -539,24 +586,80 @@ export default {
           lendingPoolAbi,
           addressJson.LendingPool,
         );
-        const aliceAddr = resolveAssetAddress("Alice");
-        const bobAddr = resolveAssetAddress("Bob");
 
-        const [summary, aliceCollateral, bobCollateral] = await Promise.all([
+        const [
+          summary,
+          collateralAssetAddresses,
+          borrowedAssetAddresses,
+          oracleAddr,
+        ] = await Promise.all([
           lendingPool.methods.getDebtVaultSummary(this.debtVaultId).call(),
           lendingPool.methods
-            .getDebtVaultCollateralAssetAmount(this.debtVaultId, aliceAddr)
+            .getDebtVaultCollateralAssets(this.debtVaultId)
             .call(),
           lendingPool.methods
-            .getDebtVaultCollateralAssetAmount(this.debtVaultId, bobAddr)
+            .getDebtVaultBorrowedAssets(this.debtVaultId)
             .call(),
+          lendingPool.methods.oracle().call(),
         ]);
+
+        this.oracleAddress = oracleAddr;
+
+        // 获取 collateral 资产信息
+        const collateralAssets = [];
+        for (const assetAddr of collateralAssetAddresses) {
+          try {
+            const amount = await lendingPool.methods
+              .getDebtVaultCollateralAssetAmount(this.debtVaultId, assetAddr)
+              .call();
+
+            const oracle = new web3.eth.Contract(oracleAbi, oracleAddr);
+            const price = await oracle.methods.getPrice(assetAddr).call();
+
+            collateralAssets.push({
+              address: assetAddr,
+              name: this.getAssetName(assetAddr),
+              rawAmount: String(amount || "0"),
+              formattedAmount: this.formatWei(String(amount || "0")),
+              rawPrice: String(price || "0"),
+              formattedPrice: this.formatWei(String(price || "0")),
+            });
+          } catch (err) {
+            console.error("Failed to load collateral asset info:", err);
+          }
+        }
+
+        // 获取 borrowed 资产信息
+        const borrowedAssets = [];
+        for (const assetAddr of borrowedAssetAddresses) {
+          try {
+            const amount = await lendingPool.methods
+              .getDebtVaultDebtAmount(this.debtVaultId, assetAddr)
+              .call();
+
+            const oracle = new web3.eth.Contract(oracleAbi, oracleAddr);
+            const price = await oracle.methods.getPrice(assetAddr).call();
+
+            borrowedAssets.push({
+              address: assetAddr,
+              name: this.getAssetName(assetAddr),
+              rawAmount: String(amount || "0"),
+              formattedAmount: this.formatWei(String(amount || "0")),
+              rawPrice: String(price || "0"),
+              formattedPrice: this.formatWei(String(price || "0")),
+            });
+          } catch (err) {
+            console.error("Failed to load borrowed asset info:", err);
+          }
+        }
 
         this.vaultDataCache[this.debtVaultId] = {
           maxBorrowableRaw: String(summary.maxBorrowableValue || "0"),
           debtValueRaw: String(summary.debtValue || "0"),
-          collateralAliceRaw: String(aliceCollateral || "0"),
-          collateralBobRaw: String(bobCollateral || "0"),
+          collateralAliceRaw: "0",
+          collateralBobRaw: "0",
+          collateralAssets,
+          borrowedAssets,
         };
       } catch (err) {
         console.error("Failed to load vault data:", err);
@@ -835,6 +938,102 @@ export default {
 .data-item {
   display: flex;
   flex-direction: column;
+}
+
+.vault-info-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(235, 235, 235);
+}
+
+.vault-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-label {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  color: rgb(90, 90, 90);
+  font-weight: 500;
+}
+
+.summary-value {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgb(30, 30, 30);
+}
+
+.assets-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.assets-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.column-title {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(30, 30, 30);
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgb(235, 235, 235);
+}
+
+.assets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.asset-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+  background-color: rgb(250, 250, 250);
+  border-radius: 4px;
+  align-items: center;
+}
+
+.asset-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(30, 30, 30);
+}
+
+.asset-amount {
+  font-size: 12px;
+  color: rgb(60, 60, 60);
+  text-align: center;
+}
+
+.asset-price {
+  font-size: 12px;
+  color: rgb(90, 90, 90);
+  text-align: right;
+}
+
+.no-assets {
+  font-size: 12px;
+  color: rgb(150, 150, 150);
+  padding: 12px;
+  text-align: center;
+  background-color: rgb(250, 250, 250);
+  border-radius: 4px;
 }
 
 .data-label {
