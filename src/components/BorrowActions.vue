@@ -62,7 +62,7 @@
 
       <div class="assets-container">
         <div class="assets-column collateral-column">
-          <h4 class="column-title">Collateral</h4>
+          <h4 class="column-title">Collaterals</h4>
           <div
             v-if="
               selectedVaultData.collateralAssets &&
@@ -84,7 +84,7 @@
         </div>
 
         <div class="assets-column borrowed-column">
-          <h4 class="column-title">Borrowed</h4>
+          <h4 class="column-title">Debts</h4>
           <div
             v-if="
               selectedVaultData.borrowedAssets &&
@@ -203,18 +203,37 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="Amount">
+        <!-- 添加模式切换按钮 -->
+        <el-form-item label="Mode">
+          <el-radio-group
+            v-model="borrowForm.mode"
+            @change="handleBorrowModeChange"
+          >
+            <el-radio label="amount">Amount</el-radio>
+            <el-radio label="value">Value ($)</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item
+          :label="borrowForm.mode === 'amount' ? 'Amount' : 'Value ($)'"
+        >
           <el-row style="width: 100%" :gutter="8">
             <el-col :span="15">
               <el-input
                 v-model="borrowForm.value"
-                placeholder="Input token amount"
+                :placeholder="
+                  borrowForm.mode === 'amount'
+                    ? 'Input token amount'
+                    : 'Input value in dollars'
+                "
                 clearable
                 style="--el-color-primary: black; --el-border-color-hover: gray"
+                @input="handleBorrowValueChange"
               ></el-input>
             </el-col>
             <el-col :span="9">
               <el-select
+                v-if="borrowForm.mode === 'amount'"
                 v-model="borrowForm.unit"
                 class="full-width"
                 style="
@@ -230,6 +249,27 @@
                 <el-option label="Gwei" value="gwei"></el-option>
                 <el-option label="Wei" value="wei"></el-option>
               </el-select>
+              <!-- 显示计算出的数量 -->
+              <div
+                v-else
+                class="calculated-amount-display"
+                style="
+                  padding: 8px;
+                  border: 1px solid #dcdfe6;
+                  border-radius: 4px;
+                  height: 33px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  box-sizing: border-box;
+                  margin-top: 1px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                "
+              >
+                {{ calculatedAmount || "0.000" }} {{ borrowForm.coin }}
+              </div>
             </el-col>
           </el-row>
         </el-form-item>
@@ -247,7 +287,7 @@
 
       <div class="data-section">
         <p class="data-label">Max Borrowable</p>
-        <p class="data-value">{{ remainingBorrowable() }}</p>
+        <p class="data-value">${{ remainingBorrowable() }}</p>
       </div>
     </CardItem>
 
@@ -416,6 +456,7 @@ import {
 } from "@/contracts/lendingPool";
 import { resolveAssetAddress } from "@/contracts/erc20";
 import { web3 } from "@/contracts/wallet";
+import { getBobPrice, getAlicePrice } from "@/contracts/oracle";
 
 export default {
   name: "BorrowActions",
@@ -438,6 +479,7 @@ export default {
         value: "",
         unit: "ether",
         submitting: false,
+        mode: "amount", // 添加mode字段
       },
       repayForm: {
         coin: "Alice",
@@ -457,7 +499,7 @@ export default {
       debtBob: "0",
       vaultDataCache: {},
       assetNameMap: {},
-      oracleAddress: "",
+      calculatedAmount: "", // 添加这个属性
     };
   },
   computed: {
@@ -488,18 +530,11 @@ export default {
 
     formatWei(raw) {
       try {
-        const num = parseFloat(web3.utils.fromWei(String(raw || "0"), "ether"));
-        return num.toFixed(2); // 修改value显示为两位小数
-      } catch {
-        return "0.00";
-      }
-    },
-
-    // 添加缺失的 formatWeiWithDecimals 方法
-    formatWeiWithDecimals(raw, decimals) {
-      try {
-        const num = parseFloat(web3.utils.fromWei(String(raw || "0"), "ether"));
-        return num.toFixed(decimals);
+        const value = parseFloat(
+          web3.utils.fromWei(String(raw || "0"), "ether"),
+        );
+        // 向下取整到3位小数
+        return Math.floor(value * 1000) / 1000;
       } catch {
         return "0.000";
       }
@@ -507,7 +542,9 @@ export default {
 
     selectedCustodied(coin) {
       const raw = coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
-      return this.formatWei(raw);
+      const value = parseFloat(this.formatWei(raw));
+      // 向下取整到3位小数
+      return Math.floor(value * 1000) / 1000;
     },
 
     remainingBorrowableRaw() {
@@ -523,12 +560,16 @@ export default {
     },
 
     remainingBorrowable() {
-      return this.formatWei(this.remainingBorrowableRaw());
+      const value = parseFloat(this.formatWei(this.remainingBorrowableRaw()));
+      // 向下取整到2位小数
+      return Math.floor(value * 100) / 100;
     },
 
     selectedDebt(coin) {
       const raw = coin === "Alice" ? this.debtAlice : this.debtBob;
-      return this.formatWei(raw);
+      const value = parseFloat(this.formatWei(raw));
+      // 向下取整到3位小数
+      return Math.floor(value * 1000) / 1000;
     },
 
     selectedVaultCollateralRaw(coin) {
@@ -539,7 +580,11 @@ export default {
     },
 
     selectedVaultCollateral(coin) {
-      return this.formatWei(this.selectedVaultCollateralRaw(coin));
+      const value = parseFloat(
+        this.formatWei(this.selectedVaultCollateralRaw(coin)),
+      );
+      // 向下取整到3位小数
+      return Math.floor(value * 1000) / 1000;
     },
 
     async refreshDebtVaultIds() {
@@ -598,23 +643,16 @@ export default {
           addressJson.LendingPool,
         );
 
-        const [
-          summary,
-          collateralAssetAddresses,
-          borrowedAssetAddresses,
-          oracleAddr,
-        ] = await Promise.all([
-          lendingPool.methods.getDebtVaultSummary(this.debtVaultId).call(),
-          lendingPool.methods
-            .getDebtVaultCollateralAssets(this.debtVaultId)
-            .call(),
-          lendingPool.methods
-            .getDebtVaultBorrowedAssets(this.debtVaultId)
-            .call(),
-          lendingPool.methods.oracle().call(),
-        ]);
-
-        this.oracleAddress = oracleAddr;
+        const [summary, collateralAssetAddresses, borrowedAssetAddresses] =
+          await Promise.all([
+            lendingPool.methods.getDebtVaultSummary(this.debtVaultId).call(),
+            lendingPool.methods
+              .getDebtVaultCollateralAssets(this.debtVaultId)
+              .call(),
+            lendingPool.methods
+              .getDebtVaultBorrowedAssets(this.debtVaultId)
+              .call(),
+          ]);
 
         // 获取 collateral 资产信息
         const collateralAssets = [];
@@ -624,26 +662,36 @@ export default {
               .getDebtVaultCollateralAssetAmount(this.debtVaultId, assetAddr)
               .call();
 
-            const oracle = new web3.eth.Contract(oracleAbi, oracleAddr);
-            const price = await oracle.methods.getPrice(assetAddr).call();
+            // 获取资产价格
+            let price;
+            const assetName = this.getAssetName(assetAddr);
+            if (assetName === "Alice") {
+              price = await getAlicePrice();
+            } else if (assetName === "Bob") {
+              price = await getBobPrice();
+            } else {
+              price = "0"; // 默认价格
+            }
 
             collateralAssets.push({
               address: assetAddr,
               name: this.getAssetName(assetAddr),
               rawAmount: String(amount || "0"),
-              formattedAmount: this.formatWei(String(amount || "0")),
+              formattedAmount: this.formatWei(String(amount || "0")), // Already formatted in formatWei method
               rawPrice: String(price || "0"),
-              formattedPrice: this.formatWei(String(price || "0")),
-              rawValue: String(
-                (BigInt(amount || "0") * BigInt(price || "0")) /
-                  BigInt(10 ** 18),
-              ),
-              formattedValue: this.formatWei(
-                String(
-                  (BigInt(amount || "0") * BigInt(price || "0")) /
-                    BigInt(10 ** 18),
-                ),
-              ),
+              formattedPrice: this.formatWei(String(price || "0")), // Already formatted in formatWei method
+              formattedValue: (() => {
+                const value = parseFloat(
+                  this.formatWei(
+                    String(
+                      (BigInt(amount || "0") * BigInt(price || "0")) /
+                        BigInt(10 ** 18),
+                    ),
+                  ),
+                );
+                // 向下取整到2位小数
+                return Math.floor(value * 100) / 100;
+              })(),
             });
           } catch (err) {
             console.error("Failed to load collateral asset info:", err);
@@ -658,26 +706,36 @@ export default {
               .getDebtVaultDebtAmount(this.debtVaultId, assetAddr)
               .call();
 
-            const oracle = new web3.eth.Contract(oracleAbi, oracleAddr);
-            const price = await oracle.methods.getPrice(assetAddr).call();
+            // 获取资产价格
+            let price;
+            const assetName = this.getAssetName(assetAddr);
+            if (assetName === "Alice") {
+              price = await getAlicePrice();
+            } else if (assetName === "Bob") {
+              price = await getBobPrice();
+            } else {
+              price = "0"; // 默认价格
+            }
 
             borrowedAssets.push({
               address: assetAddr,
               name: this.getAssetName(assetAddr),
               rawAmount: String(amount || "0"),
-              formattedAmount: this.formatWei(String(amount || "0")),
+              formattedAmount: this.formatWei(String(amount || "0")), // Already formatted in formatWei method
               rawPrice: String(price || "0"),
-              formattedPrice: this.formatWei(String(price || "0")),
-              rawValue: String(
-                (BigInt(amount || "0") * BigInt(price || "0")) /
-                  BigInt(10 ** 18),
-              ),
-              formattedValue: this.formatWei(
-                String(
-                  (BigInt(amount || "0") * BigInt(price || "0")) /
-                    BigInt(10 ** 18),
-                ),
-              ),
+              formattedPrice: this.formatWei(String(price || "0")), // Already formatted in formatWei method
+              formattedValue: (() => {
+                const value = parseFloat(
+                  this.formatWei(
+                    String(
+                      (BigInt(amount || "0") * BigInt(price || "0")) /
+                        BigInt(10 ** 18),
+                    ),
+                  ),
+                );
+                // 向下取整到2位小数
+                return Math.floor(value * 100) / 100;
+              })(),
             });
           } catch (err) {
             console.error("Failed to load borrowed asset info:", err);
@@ -900,6 +958,49 @@ export default {
         form.submitting = false;
       }
     },
+
+    async handleBorrowValueChange(value) {
+      if (!value || isNaN(value) || !this.borrowForm.coin) return;
+
+      // 如果用户正在输入价值，则自动计算金额
+      if (this.borrowForm.mode === "value") {
+        await this.calculateAmountFromValue();
+      }
+    },
+
+    async calculateAmountFromValue() {
+      const valueInDollars = parseFloat(this.borrowForm.value);
+
+      if (!valueInDollars || valueInDollars <= 0) {
+        this.calculatedAmount = "";
+        return;
+      }
+
+      // 获取当前资产的价格
+      const assetName = this.borrowForm.coin;
+
+      let price;
+      if (assetName === "Alice") {
+        price = await getAlicePrice();
+      } else if (assetName === "Bob") {
+        price = await getBobPrice();
+      } else {
+        ElMessage.warning("Unsupported asset for price fetching");
+        return;
+      }
+
+      if (!price || price === "0") {
+        ElMessage.warning("Asset price not available");
+        return;
+      }
+
+      // 计算金额：value / price = amount
+      const priceInEth = parseFloat(web3.utils.fromWei(price, "ether"));
+      const amount = valueInDollars / priceInEth;
+
+      // 向下取整到3位小数
+      this.calculatedAmount = Math.floor(amount * 1000) / 1000;
+    },
   },
 };
 </script>
@@ -1087,5 +1188,17 @@ export default {
 
 :deep(.el-select-dropdown__item.is-selected span) {
   color: black !important;
+}
+
+:deep(.el-radio__input.is-checked + .el-radio__label) {
+  color: black !important;
+}
+
+/* 选中后圆圈的背景颜色 */
+
+:deep(.el-radio__input.is-checked .el-radio__inner) {
+  background: black !important;
+
+  border-color: black !important;
 }
 </style>
