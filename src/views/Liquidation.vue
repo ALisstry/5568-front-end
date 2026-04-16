@@ -2,269 +2,226 @@
   <div class="container">
     <CardItem class="liquidation-card">
       <div class="card-header">
-        <h3 class="card-title">Direct Liquidation</h3>
+        <h3 class="card-title">Liquidatable DebtVaults</h3>
+        <el-button plain class="mini-btn" :loading="loading" @click="refreshTables">
+          Refresh
+        </el-button>
       </div>
 
-      <el-form class="action-form" label-position="right" label-width="120px">
-        <el-form-item label="DebtVault">
-          <el-row style="width: 100%" :gutter="8">
-            <el-col :span="14">
-              <el-select
-                v-model="direct.debtVaultId"
-                filterable
-                allow-create
-                default-first-option
-                class="full-width"
-                placeholder="Select or input DebtVault ID"
-                style="
-                  --el-color-primary: black;
-                  --el-border-color-hover: gray;
-                  --el-text-color-primary: black;
-                "
-                popper-class="selectStyle"
-              >
-                <el-option
-                  v-for="id in debtVaultIds"
-                  :key="id"
-                  :label="`#${id}`"
-                  :value="String(id)"
-                ></el-option>
-              </el-select>
-            </el-col>
-            <el-col :span="10" style="display: flex; gap: 8px">
-              <el-button plain class="mini-btn" @click="refreshDebtVaultIds"
-                >Refresh</el-button
-              >
-              <el-button
-                plain
-                class="mini-btn"
-                :loading="direct.submitting"
-                @click="loadSelectedVaultData('direct')"
-                >Load</el-button
-              >
-            </el-col>
-          </el-row>
-        </el-form-item>
+      <p v-if="error" class="error-line">{{ error }}</p>
+      <p v-if="!loading && !liquidationTables.length" class="empty-line">
+        No liquidatable DebtVaults found.
+      </p>
 
-        <el-form-item label="Debt Asset">
-          <el-select
-            v-model="direct.debtAsset"
-            class="full-width"
-            style="
-              --el-color-primary: black;
-              --el-border-color-hover: gray;
-              --el-text-color-primary: black;
-            "
-            popper-class="selectStyle"
-          >
-            <el-option label="Alice" value="Alice"></el-option>
-            <el-option label="Bob" value="Bob"></el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="Collateral Asset">
-          <el-select
-            v-model="direct.collateralAsset"
-            class="full-width"
-            style="
-              --el-color-primary: black;
-              --el-border-color-hover: gray;
-              --el-text-color-primary: black;
-            "
-            popper-class="selectStyle"
-          >
-            <el-option label="Alice" value="Alice"></el-option>
-            <el-option label="Bob" value="Bob"></el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="Repay Amount">
-          <el-row style="width: 100%" :gutter="8">
-            <el-col :span="15">
-              <el-input
-                v-model="direct.amount"
-                placeholder="Token amount"
-                clearable
-                style="--el-color-primary: black; --el-border-color-hover: gray"
-              ></el-input>
-            </el-col>
-            <el-col :span="9">
-              <el-select
-                v-model="direct.unit"
-                class="full-width"
-                style="
-                  --el-color-primary: black;
-                  --el-border-color-hover: gray;
-                  --el-text-color-primary: black;
-                "
-                popper-class="selectStyle"
-              >
-                <el-option label="Ether" value="ether"></el-option>
-                <el-option label="Finney" value="finney"></el-option>
-                <el-option label="Szabo" value="szabo"></el-option>
-                <el-option label="Gwei" value="gwei"></el-option>
-                <el-option label="Wei" value="wei"></el-option>
-              </el-select>
-            </el-col>
-          </el-row>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button
-            type="primary"
-            class="submit-btn"
-            :loading="direct.submitting"
-            @click="onDirectLiquidate"
-          >
-            Liquidate
-          </el-button>
-        </el-form-item>
-      </el-form>
-
-      <div class="data-section" v-if="directVaultData">
-        <p class="data-label">Health Factor</p>
-        <p class="data-value">{{ directVaultData.hf }}</p>
-        <p class="data-label">Total Debt Value</p>
-        <p class="data-value">{{ directVaultData.debtValue }}</p>
-        <p class="data-label">Collateral Alice</p>
-        <p class="data-value">{{ directVaultData.collateralAlice }}</p>
-        <p class="data-label">Collateral Bob</p>
-        <p class="data-value">{{ directVaultData.collateralBob }}</p>
+      <div
+        v-for="row in liquidationTables"
+        :key="row.debtVaultId"
+        class="table-row"
+      >
+        <div class="row-main">
+          <p class="row-title">#{{ row.debtVaultId }}</p>
+          <p class="row-sub">Borrower: {{ shortAddress(row.borrower) }}</p>
+          <p class="row-sub">Health Factor: {{ row.healthFactor }}</p>
+          <p class="row-sub">Debt Value: {{ row.debtValue }}</p>
+          <p class="row-sub">Collateral Value: {{ row.collateralValue }}</p>
+        </div>
+        <el-button plain class="mini-btn" @click="openLiquidationDialog(row)">
+          Liquidate
+        </el-button>
       </div>
     </CardItem>
 
-    <CardItem class="liquidation-card">
-      <div class="card-header">
-        <h3 class="card-title">Flash Liquidation</h3>
+    <el-dialog
+      v-model="dialog.visible"
+      width="760px"
+      :title="`Liquidate DebtVault #${dialog.debtVaultId || '-'}`"
+      destroy-on-close
+    >
+      <div class="dialog-grid">
+        <div class="dialog-info">
+          <p class="info-line">
+            <span class="info-label">Borrower</span>
+            <span class="info-value">{{ shortAddress(dialog.borrower) }}</span>
+          </p>
+          <p class="info-line">
+            <span class="info-label">Health Factor</span>
+            <span class="info-value">{{ dialog.healthFactor || "-" }}</span>
+          </p>
+          <p class="info-line">
+            <span class="info-label">Debt Value</span>
+            <span class="info-value">{{ dialog.debtValue || "-" }}</span>
+          </p>
+          <p class="info-line">
+            <span class="info-label">Collateral Value</span>
+            <span class="info-value">{{ dialog.collateralValue || "-" }}</span>
+          </p>
+        </div>
+
+        <el-tabs v-model="tabMode" class="mode-tabs">
+          <el-tab-pane label="Direct Liquidation" name="direct">
+            <el-form class="action-form" label-position="right" label-width="130px">
+              <el-form-item label="Debt Asset">
+                <el-select
+                  v-model="direct.debtAsset"
+                  class="full-width"
+                  style="
+                    --el-color-primary: black;
+                    --el-border-color-hover: gray;
+                    --el-text-color-primary: black;
+                  "
+                  popper-class="selectStyle"
+                >
+                  <el-option label="Alice" value="Alice"></el-option>
+                  <el-option label="Bob" value="Bob"></el-option>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="Collateral Asset">
+                <el-select
+                  v-model="direct.collateralAsset"
+                  class="full-width"
+                  style="
+                    --el-color-primary: black;
+                    --el-border-color-hover: gray;
+                    --el-text-color-primary: black;
+                  "
+                  popper-class="selectStyle"
+                >
+                  <el-option label="Alice" value="Alice"></el-option>
+                  <el-option label="Bob" value="Bob"></el-option>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="Repay Amount">
+                <el-row style="width: 100%" :gutter="8">
+                  <el-col :span="15">
+                    <el-input
+                      v-model="direct.amount"
+                      placeholder="Token amount"
+                      clearable
+                      style="
+                        --el-color-primary: black;
+                        --el-border-color-hover: gray;
+                      "
+                    ></el-input>
+                  </el-col>
+                  <el-col :span="9">
+                    <el-select
+                      v-model="direct.unit"
+                      class="full-width"
+                      style="
+                        --el-color-primary: black;
+                        --el-border-color-hover: gray;
+                        --el-text-color-primary: black;
+                      "
+                      popper-class="selectStyle"
+                    >
+                      <el-option label="Ether" value="ether"></el-option>
+                      <el-option label="Finney" value="finney"></el-option>
+                      <el-option label="Szabo" value="szabo"></el-option>
+                      <el-option label="Gwei" value="gwei"></el-option>
+                      <el-option label="Wei" value="wei"></el-option>
+                    </el-select>
+                  </el-col>
+                </el-row>
+              </el-form-item>
+
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  class="submit-btn"
+                  :loading="direct.submitting"
+                  @click="onDirectLiquidate"
+                >
+                  Execute Direct Liquidation
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <el-tab-pane label="Flash Liquidation" name="flash">
+            <el-form class="action-form" label-position="right" label-width="130px">
+              <el-form-item label="Debt Asset">
+                <el-select
+                  v-model="flash.debtAsset"
+                  class="full-width"
+                  style="
+                    --el-color-primary: black;
+                    --el-border-color-hover: gray;
+                    --el-text-color-primary: black;
+                  "
+                  popper-class="selectStyle"
+                >
+                  <el-option label="Alice" value="Alice"></el-option>
+                  <el-option label="Bob" value="Bob"></el-option>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="Collateral Asset">
+                <el-select
+                  v-model="flash.collateralAsset"
+                  class="full-width"
+                  style="
+                    --el-color-primary: black;
+                    --el-border-color-hover: gray;
+                    --el-text-color-primary: black;
+                  "
+                  popper-class="selectStyle"
+                >
+                  <el-option label="Alice" value="Alice"></el-option>
+                  <el-option label="Bob" value="Bob"></el-option>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="Borrow Amount">
+                <el-row style="width: 100%" :gutter="8">
+                  <el-col :span="15">
+                    <el-input
+                      v-model="flash.amount"
+                      placeholder="Token amount"
+                      clearable
+                      style="
+                        --el-color-primary: black;
+                        --el-border-color-hover: gray;
+                      "
+                    ></el-input>
+                  </el-col>
+                  <el-col :span="9">
+                    <el-select
+                      v-model="flash.unit"
+                      class="full-width"
+                      style="
+                        --el-color-primary: black;
+                        --el-border-color-hover: gray;
+                        --el-text-color-primary: black;
+                      "
+                      popper-class="selectStyle"
+                    >
+                      <el-option label="Ether" value="ether"></el-option>
+                      <el-option label="Finney" value="finney"></el-option>
+                      <el-option label="Szabo" value="szabo"></el-option>
+                      <el-option label="Gwei" value="gwei"></el-option>
+                      <el-option label="Wei" value="wei"></el-option>
+                    </el-select>
+                  </el-col>
+                </el-row>
+              </el-form-item>
+
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  class="submit-btn"
+                  :loading="flash.submitting"
+                  @click="onFlashLiquidate"
+                >
+                  Execute Flash Liquidation
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+        </el-tabs>
       </div>
-
-      <el-form class="action-form" label-position="right" label-width="120px">
-        <el-form-item label="DebtVault">
-          <el-row style="width: 100%" :gutter="8">
-            <el-col :span="14">
-              <el-select
-                v-model="flash.debtVaultId"
-                filterable
-                allow-create
-                default-first-option
-                class="full-width"
-                placeholder="Select or input DebtVault ID"
-                style="
-                  --el-color-primary: black;
-                  --el-border-color-hover: gray;
-                  --el-text-color-primary: black;
-                "
-                popper-class="selectStyle"
-              >
-                <el-option
-                  v-for="id in debtVaultIds"
-                  :key="id"
-                  :label="`#${id}`"
-                  :value="String(id)"
-                ></el-option>
-              </el-select>
-            </el-col>
-            <el-col :span="10" style="display: flex; gap: 8px">
-              <el-button plain class="mini-btn" @click="refreshDebtVaultIds"
-                >Refresh</el-button
-              >
-              <el-button
-                plain
-                class="mini-btn"
-                :loading="flash.submitting"
-                @click="loadSelectedVaultData('flash')"
-                >Load</el-button
-              >
-            </el-col>
-          </el-row>
-        </el-form-item>
-
-        <el-form-item label="Debt Asset">
-          <el-select
-            v-model="flash.debtAsset"
-            class="full-width"
-            style="
-              --el-color-primary: black;
-              --el-border-color-hover: gray;
-              --el-text-color-primary: black;
-            "
-            popper-class="selectStyle"
-          >
-            <el-option label="Alice" value="Alice"></el-option>
-            <el-option label="Bob" value="Bob"></el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="Collateral Asset">
-          <el-select
-            v-model="flash.collateralAsset"
-            class="full-width"
-            style="
-              --el-color-primary: black;
-              --el-border-color-hover: gray;
-              --el-text-color-primary: black;
-            "
-            popper-class="selectStyle"
-          >
-            <el-option label="Alice" value="Alice"></el-option>
-            <el-option label="Bob" value="Bob"></el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="Borrow Amount">
-          <el-row style="width: 100%" :gutter="8">
-            <el-col :span="15">
-              <el-input
-                v-model="flash.amount"
-                placeholder="Token amount"
-                clearable
-                style="--el-color-primary: black; --el-border-color-hover: gray"
-              ></el-input>
-            </el-col>
-            <el-col :span="9">
-              <el-select
-                v-model="flash.unit"
-                class="full-width"
-                style="
-                  --el-color-primary: black;
-                  --el-border-color-hover: gray;
-                  --el-text-color-primary: black;
-                "
-                popper-class="selectStyle"
-              >
-                <el-option label="Ether" value="ether"></el-option>
-                <el-option label="Finney" value="finney"></el-option>
-                <el-option label="Szabo" value="szabo"></el-option>
-                <el-option label="Gwei" value="gwei"></el-option>
-                <el-option label="Wei" value="wei"></el-option>
-              </el-select>
-            </el-col>
-          </el-row>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button
-            type="primary"
-            class="submit-btn"
-            :loading="flash.submitting"
-            @click="onFlashLiquidate"
-          >
-            Flash Liquidate
-          </el-button>
-        </el-form-item>
-      </el-form>
-
-      <div class="data-section" v-if="flashVaultData">
-        <p class="data-label">Health Factor</p>
-        <p class="data-value">{{ flashVaultData.hf }}</p>
-        <p class="data-label">Total Debt Value</p>
-        <p class="data-value">{{ flashVaultData.debtValue }}</p>
-        <p class="data-label">Collateral Alice</p>
-        <p class="data-value">{{ flashVaultData.collateralAlice }}</p>
-        <p class="data-label">Collateral Bob</p>
-        <p class="data-value">{{ flashVaultData.collateralBob }}</p>
-      </div>
-    </CardItem>
+    </el-dialog>
   </div>
 </template>
 
@@ -274,7 +231,7 @@ import CardItem from "@/components/CardItem.vue";
 import lendingPoolAbi from "@/ABI/LendingPool.json" with { type: "json" };
 import addressJson from "@/contracts/address.json" with { type: "json" };
 import { web3 } from "@/contracts/wallet";
-import { getOwnerDebtVaultIds, liquidate } from "@/contracts/lendingPool";
+import { liquidate } from "@/contracts/lendingPool";
 import { flashLiquidate } from "@/contracts/flashLoanBot";
 
 export default {
@@ -284,8 +241,19 @@ export default {
   },
   data() {
     return {
-      direct: {
+      loading: false,
+      error: "",
+      liquidationTables: [],
+      tabMode: "direct",
+      dialog: {
+        visible: false,
         debtVaultId: "",
+        borrower: "",
+        healthFactor: "",
+        debtValue: "",
+        collateralValue: "",
+      },
+      direct: {
         debtAsset: "Alice",
         collateralAsset: "Bob",
         amount: "",
@@ -293,103 +261,72 @@ export default {
         submitting: false,
       },
       flash: {
-        debtVaultId: "",
         debtAsset: "Alice",
         collateralAsset: "Bob",
         amount: "",
         unit: "ether",
         submitting: false,
       },
-      debtVaultIds: [],
-      vaultDataCache: {},
     };
   },
-  computed: {
-    directVaultData() {
-      return this.vaultDataCache[this.direct.debtVaultId] || null;
-    },
-    flashVaultData() {
-      return this.vaultDataCache[this.flash.debtVaultId] || null;
-    },
-  },
   async mounted() {
-    await this.refreshDebtVaultIds();
+    await this.refreshTables();
   },
   methods: {
-    async refreshDebtVaultIds() {
+    shortAddress(address) {
+      if (!address) return "-";
+      return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    },
+
+    formatWei(value) {
       try {
-        const ids = await getOwnerDebtVaultIds();
-        this.debtVaultIds = ids.map((id) => String(id));
-
-        if (!this.direct.debtVaultId && this.debtVaultIds.length) {
-          this.direct.debtVaultId = this.debtVaultIds[0];
-        }
-        if (!this.flash.debtVaultId && this.debtVaultIds.length) {
-          this.flash.debtVaultId = this.debtVaultIds[0];
-        }
-      } catch (err) {
-        ElMessage.error(this.getErrorMessage(err));
+        return web3.utils.fromWei(String(value || "0"), "ether");
+      } catch {
+        return "0";
       }
     },
 
-    async loadSelectedVaultData(section) {
-      const debtVaultId =
-        section === "direct" ? this.direct.debtVaultId : this.flash.debtVaultId;
-      if (!debtVaultId) {
-        ElMessage.warning("Please select a DebtVault ID first.");
-        return;
-      }
-      await this.loadVaultData(debtVaultId);
-    },
-
-    async loadVaultData(debtVaultId) {
+    async refreshTables() {
+      this.loading = true;
+      this.error = "";
       try {
         const lendingPool = new web3.eth.Contract(
           lendingPoolAbi,
           addressJson.LendingPool,
         );
-        const aliceAddr = addressJson.AliceToken;
-        const bobAddr = addressJson.BobToken;
-
-        const [summary, aliceCollateral, bobCollateral] = await Promise.all([
-          lendingPool.methods.getDebtVaultSummary(debtVaultId).call(),
-          lendingPool.methods
-            .getDebtVaultCollateralAssetAmount(debtVaultId, aliceAddr)
-            .call(),
-          lendingPool.methods
-            .getDebtVaultCollateralAssetAmount(debtVaultId, bobAddr)
-            .call(),
-        ]);
-
-        this.vaultDataCache = {
-          ...this.vaultDataCache,
-          [debtVaultId]: {
-            hf: web3.utils.fromWei(
-              summary.hf || summary.healthFactor || "0",
-              "ether",
-            ),
-            debtValue: web3.utils.fromWei(summary.debtValue || "0", "ether"),
-            maxBorrowable: web3.utils.fromWei(
-              summary.maxBorrowableValue || "0",
-              "ether",
-            ),
-            collateralAlice: web3.utils.fromWei(
-              aliceCollateral || "0",
-              "ether",
-            ),
-            collateralBob: web3.utils.fromWei(bobCollateral || "0", "ether"),
-          },
-        };
+        const rows = await lendingPool.methods.getLiquidationTables().call();
+        this.liquidationTables = (rows || []).map((item) => ({
+          debtVaultId: String(item.debtVaultId || ""),
+          borrower: String(item.borrower || ""),
+          healthFactor: this.formatWei(item.healthFactor),
+          debtValue: this.formatWei(item.debtValue),
+          collateralValue: this.formatWei(item.collateralValue),
+        }));
       } catch (err) {
-        console.error("Failed to load vault data:", err);
-        ElMessage.error(this.getErrorMessage(err));
+        this.error = this.getErrorMessage(err);
+      } finally {
+        this.loading = false;
       }
+    },
+
+    openLiquidationDialog(row) {
+      this.dialog = {
+        visible: true,
+        debtVaultId: row.debtVaultId,
+        borrower: row.borrower,
+        healthFactor: row.healthFactor,
+        debtValue: row.debtValue,
+        collateralValue: row.collateralValue,
+      };
+      this.tabMode = "direct";
+      this.direct.amount = "";
+      this.flash.amount = "";
     },
 
     async onDirectLiquidate() {
       if (this.direct.submitting) return;
-      if (!this.direct.debtVaultId) {
-        ElMessage.warning("DebtVault ID is required");
+      if (!this.dialog.debtVaultId) {
+        ElMessage.warning("Please select a liquidatable DebtVault first.");
         return;
       }
       if (!this.direct.amount || Number(this.direct.amount) <= 0) {
@@ -400,15 +337,15 @@ export default {
       this.direct.submitting = true;
       try {
         const result = await liquidate({
-          debtVaultId: this.direct.debtVaultId,
+          debtVaultId: this.dialog.debtVaultId,
           debtAsset: this.direct.debtAsset,
           collateralAsset: this.direct.collateralAsset,
           amount: this.direct.amount,
           unit: this.direct.unit,
         });
-
         ElMessage.success(`Direct liquidation success. Tx: ${result.txHash}`);
-        await this.loadVaultData(this.direct.debtVaultId);
+        this.dialog.visible = false;
+        await this.refreshTables();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
       } finally {
@@ -418,8 +355,8 @@ export default {
 
     async onFlashLiquidate() {
       if (this.flash.submitting) return;
-      if (!this.flash.debtVaultId) {
-        ElMessage.warning("DebtVault ID is required");
+      if (!this.dialog.debtVaultId) {
+        ElMessage.warning("Please select a liquidatable DebtVault first.");
         return;
       }
       if (!this.flash.amount || Number(this.flash.amount) <= 0) {
@@ -430,15 +367,15 @@ export default {
       this.flash.submitting = true;
       try {
         const result = await flashLiquidate({
-          debtVaultId: this.flash.debtVaultId,
+          debtVaultId: this.dialog.debtVaultId,
           debtAsset: this.flash.debtAsset,
           collateralAsset: this.flash.collateralAsset,
           amount: this.flash.amount,
           unit: this.flash.unit,
         });
-
         ElMessage.success(`Flash liquidation success. Tx: ${result.txHash}`);
-        await this.loadVaultData(this.flash.debtVaultId);
+        this.dialog.visible = false;
+        await this.refreshTables();
       } catch (err) {
         ElMessage.error(this.getErrorMessage(err));
       } finally {
@@ -454,12 +391,6 @@ export default {
         String(err) ||
         "Transaction failed";
 
-      if (message.includes("insufficient collateral")) {
-        return "❌ Insufficient collateral. Please deposit and collateralize first.";
-      }
-      if (message.includes("collateral disabled")) {
-        return "❌ Asset not configured as collateral. Check contract settings.";
-      }
       if (message.includes("insufficient balance")) {
         return "❌ Insufficient balance.";
       }
@@ -493,6 +424,9 @@ export default {
 
 .card-header {
   margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .card-title {
@@ -500,6 +434,71 @@ export default {
   font-size: 18px;
   font-weight: 600;
   color: rgb(30, 30, 30);
+}
+
+.error-line {
+  margin: 0 0 12px 0;
+  color: #d9534f;
+}
+
+.empty-line {
+  margin: 0;
+  color: rgb(90, 90, 90);
+}
+
+.table-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-top: 1px solid rgb(235, 235, 235);
+  gap: 12px;
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-title {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgb(30, 30, 30);
+}
+
+.row-sub {
+  margin: 0 0 4px 0;
+  color: rgb(80, 80, 80);
+}
+
+.dialog-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.dialog-info {
+  border: 1px solid rgb(235, 235, 235);
+  padding: 12px;
+}
+
+.info-line {
+  margin: 0 0 8px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.info-label {
+  color: rgb(90, 90, 90);
+}
+
+.info-value {
+  color: rgb(30, 30, 30);
+  font-weight: 600;
+}
+
+.mode-tabs {
+  width: 100%;
 }
 
 .action-form {
@@ -529,31 +528,17 @@ export default {
   background-color: rgb(200, 200, 200);
 }
 
-.data-section {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid rgb(235, 235, 235);
-}
-
-.data-label {
-  margin: 0 0 6px 0;
-  font-size: 12px;
-  color: rgb(90, 90, 90);
-  font-weight: 500;
-}
-
-.data-value {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: rgb(30, 30, 30);
-}
-
 :deep(.el-select-dropdown__item.is-selected) {
   color: black !important;
 }
 
 :deep(.el-select-dropdown__item.is-selected span) {
   color: black !important;
+}
+
+@media (max-width: 768px) {
+  .table-row {
+    flex-direction: column;
+  }
 }
 </style>
