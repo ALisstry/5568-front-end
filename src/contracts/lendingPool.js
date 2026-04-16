@@ -123,6 +123,19 @@ export async function getUserCustodiedShares(userAddress, assetAddress) {
   }
 }
 
+export async function getUserCustodiedAssetAmount(userAddress, assetAddress) {
+  const user = userAddress || (await getDefaultAccount());
+  try {
+    const amount = await lendingPool.methods
+      .getUserCustodiedAssetAmount(user, assetAddress)
+      .call();
+    return String(amount);
+  } catch (err) {
+    console.error("Failed to get custodied asset amount:", err);
+    return "0";
+  }
+}
+
 export async function getUserDebtBalance(userAddress, assetAddress) {
   const user = userAddress || (await getDefaultAccount());
   try {

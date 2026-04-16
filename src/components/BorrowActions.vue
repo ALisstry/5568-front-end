@@ -47,20 +47,28 @@
     </el-form>
 
     <div class="data-section" v-if="selectedVaultData">
-      <p class="data-label">Max Borrowable</p>
-      <p class="data-value">
-        {{ formatWei(selectedVaultData.maxBorrowableRaw) }}
-      </p>
-      <p class="data-label">Debt Value</p>
-      <p class="data-value">{{ formatWei(selectedVaultData.debtValueRaw) }}</p>
-      <p class="data-label">Alice Collateral</p>
-      <p class="data-value">
-        {{ formatWei(selectedVaultData.collateralAliceRaw) }}
-      </p>
-      <p class="data-label">Bob Collateral</p>
-      <p class="data-value">
-        {{ formatWei(selectedVaultData.collateralBobRaw) }}
-      </p>
+      <div class="data-item">
+        <p class="data-label">Max Borrowable</p>
+        <p class="data-value">${{ remainingBorrowable() }}</p>
+      </div>
+      <div class="data-item">
+        <p class="data-label">Debt Value</p>
+        <p class="data-value">
+          ${{ formatWei(selectedVaultData.debtValueRaw) }}
+        </p>
+      </div>
+      <div class="data-item">
+        <p class="data-label">Alice Collateral</p>
+        <p class="data-value">
+          ${{ formatWei(selectedVaultData.collateralAliceRaw) }}
+        </p>
+      </div>
+      <div class="data-item">
+        <p class="data-label">Bob Collateral</p>
+        <p class="data-value">
+          ${{ formatWei(selectedVaultData.collateralBobRaw) }}
+        </p>
+      </div>
     </div>
   </CardItem>
   <div class="actions-grid">
@@ -203,13 +211,7 @@
 
       <div class="data-section">
         <p class="data-label">Max Borrowable</p>
-        <p class="data-value">
-          {{
-            selectedVaultData
-              ? formatWei(selectedVaultData.maxBorrowableRaw)
-              : "0"
-          }}
-        </p>
+        <p class="data-value">{{ remainingBorrowable() }}</p>
       </div>
     </CardItem>
 
@@ -368,8 +370,8 @@ import addressJson from "@/contracts/address.json" with { type: "json" };
 import {
   borrow,
   depositCollateral,
+  getUserCustodiedAssetAmount,
   getOwnerDebtVaultIds,
-  getUserCustodiedShares,
   getUserDebtBalance,
   openDebtVault,
   repay,
@@ -450,6 +452,22 @@ export default {
       return this.formatWei(raw);
     },
 
+    remainingBorrowableRaw() {
+      if (!this.selectedVaultData) return "0";
+      try {
+        const max = BigInt(this.selectedVaultData.maxBorrowableRaw || "0");
+        const debt = BigInt(this.selectedVaultData.debtValueRaw || "0");
+        if (max <= debt) return "0";
+        return (max - debt).toString();
+      } catch {
+        return "0";
+      }
+    },
+
+    remainingBorrowable() {
+      return this.formatWei(this.remainingBorrowableRaw());
+    },
+
     selectedDebt(coin) {
       const raw = coin === "Alice" ? this.debtAlice : this.debtBob;
       return this.formatWei(raw);
@@ -485,8 +503,8 @@ export default {
         const bobAddr = resolveAssetAddress("Bob");
 
         const [aliceShares, bobShares] = await Promise.all([
-          getUserCustodiedShares(undefined, aliceAddr),
-          getUserCustodiedShares(undefined, bobAddr),
+          getUserCustodiedAssetAmount(undefined, aliceAddr),
+          getUserCustodiedAssetAmount(undefined, bobAddr),
         ]);
 
         this.custodiedAlice = aliceShares;
@@ -645,6 +663,15 @@ export default {
         return;
       }
 
+      const requestedWei = this.amountToWei(form.value, form.unit);
+      const availableBorrowable = this.remainingBorrowableRaw();
+      if (BigInt(requestedWei) > BigInt(availableBorrowable || "0")) {
+        ElMessage.warning(
+          `Borrow amount exceeds remaining borrowable. Remaining: ${this.remainingBorrowable()}`,
+        );
+        return;
+      }
+
       form.submitting = true;
       try {
         const result = await borrow({
@@ -800,6 +827,14 @@ export default {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid rgb(235, 235, 235);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.data-item {
+  display: flex;
+  flex-direction: column;
 }
 
 .data-label {
