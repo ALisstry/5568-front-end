@@ -77,7 +77,7 @@
             >
               <div class="asset-name">{{ asset.name }}</div>
               <div class="asset-amount">{{ asset.formattedAmount }}</div>
-              <div class="asset-price">${{ asset.formattedPrice }}</div>
+              <div class="asset-value">${{ asset.formattedValue }}</div>
             </div>
           </div>
           <div v-else class="no-assets">No collateral</div>
@@ -99,7 +99,7 @@
             >
               <div class="asset-name">{{ asset.name }}</div>
               <div class="asset-amount">{{ asset.formattedAmount }}</div>
-              <div class="asset-price">${{ asset.formattedPrice }}</div>
+              <div class="asset-value">${{ asset.formattedValue }}</div>
             </div>
           </div>
           <div v-else class="no-assets">No borrowing</div>
@@ -623,6 +623,16 @@ export default {
               formattedAmount: this.formatWei(String(amount || "0")),
               rawPrice: String(price || "0"),
               formattedPrice: this.formatWei(String(price || "0")),
+              rawValue: String(
+                (BigInt(amount || "0") * BigInt(price || "0")) /
+                  BigInt(10 ** 18),
+              ),
+              formattedValue: this.formatWei(
+                String(
+                  (BigInt(amount || "0") * BigInt(price || "0")) /
+                    BigInt(10 ** 18),
+                ),
+              ),
             });
           } catch (err) {
             console.error("Failed to load collateral asset info:", err);
@@ -647,6 +657,16 @@ export default {
               formattedAmount: this.formatWei(String(amount || "0")),
               rawPrice: String(price || "0"),
               formattedPrice: this.formatWei(String(price || "0")),
+              rawValue: String(
+                (BigInt(amount || "0") * BigInt(price || "0")) /
+                  BigInt(10 ** 18),
+              ),
+              formattedValue: this.formatWei(
+                String(
+                  (BigInt(amount || "0") * BigInt(price || "0")) /
+                    BigInt(10 ** 18),
+                ),
+              ),
             });
           } catch (err) {
             console.error("Failed to load borrowed asset info:", err);
@@ -1021,7 +1041,7 @@ export default {
   text-align: center;
 }
 
-.asset-price {
+.asset-value {
   font-size: 12px;
   color: rgb(90, 90, 90);
   text-align: right;
