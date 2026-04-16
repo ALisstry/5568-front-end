@@ -413,7 +413,6 @@ import {
   openDebtVault,
   repay,
   withdrawCollateral,
-  getUserClaimableAssetAmount,
 } from "@/contracts/lendingPool";
 import { resolveAssetAddress } from "@/contracts/erc20";
 import { web3 } from "@/contracts/wallet";
@@ -489,9 +488,20 @@ export default {
 
     formatWei(raw) {
       try {
-        return web3.utils.fromWei(String(raw || "0"), "ether");
+        const num = parseFloat(web3.utils.fromWei(String(raw || "0"), "ether"));
+        return num.toFixed(2); // 修改value显示为两位小数
       } catch {
-        return "0";
+        return "0.00";
+      }
+    },
+
+    // 添加缺失的 formatWeiWithDecimals 方法
+    formatWeiWithDecimals(raw, decimals) {
+      try {
+        const num = parseFloat(web3.utils.fromWei(String(raw || "0"), "ether"));
+        return num.toFixed(decimals);
+      } catch {
+        return "0.000";
       }
     },
 
@@ -551,14 +561,14 @@ export default {
         const bobAddr = resolveAssetAddress("Bob");
 
         const [aliceShares, bobShares] = await Promise.all([
-          getUserClaimableAssetAmount(undefined, aliceAddr),
-          getUserClaimableAssetAmount(undefined, bobAddr),
+          getUserCustodiedAssetAmount(undefined, aliceAddr),
+          getUserCustodiedAssetAmount(undefined, bobAddr),
         ]);
 
         this.custodiedAlice = aliceShares;
         this.custodiedBob = bobShares;
       } catch (err) {
-        console.error("Failed to refresh claimable shares:", err);
+        console.error("Failed to refresh custodied shares:", err);
       }
     },
 
@@ -674,24 +684,14 @@ export default {
           }
         }
 
-        // 更新缓存数据，确保正确存储抵押品金额
-        const updatedVaultData = {
+        this.vaultDataCache[this.debtVaultId] = {
           maxBorrowableRaw: String(summary.maxBorrowableValue || "0"),
           debtValueRaw: String(summary.debtValue || "0"),
+          collateralAliceRaw: "0",
+          collateralBobRaw: "0",
           collateralAssets,
           borrowedAssets,
         };
-
-        // 为每个抵押品设置专门的金额字段
-        collateralAssets.forEach(asset => {
-          if (asset.name === "Alice") {
-            updatedVaultData.collateralAliceRaw = asset.rawAmount;
-          } else if (asset.name === "Bob") {
-            updatedVaultData.collateralBobRaw = asset.rawAmount;
-          }
-        });
-
-        this.vaultDataCache[this.debtVaultId] = updatedVaultData;
       } catch (err) {
         console.error("Failed to load vault data:", err);
       }

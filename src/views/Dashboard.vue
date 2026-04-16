@@ -486,16 +486,16 @@ export default {
             <span class="metric-value">{{ lastUpdated || "-" }}</span>
           </div>
           <div class="metric-item">
-            <span class="metric-label">Alice Balance</span>
-            <span class="metric-value"
-              >${{ formatUnits(aliceBalanceRaw, aliceDecimals) }}</span
-            >
+            <span class="metric-label">Alice Amount</span>
+            <span class="metric-value">{{
+              formatUnits(aliceBalanceRaw, aliceDecimals)
+            }}</span>
           </div>
           <div class="metric-item">
-            <span class="metric-label">Bob Balance</span>
-            <span class="metric-value"
-              >${{ formatUnits(bobBalanceRaw, bobDecimals) }}</span
-            >
+            <span class="metric-label">Bob Amount</span>
+            <span class="metric-value">{{
+              formatUnits(bobBalanceRaw, bobDecimals)
+            }}</span>
           </div>
           <div class="metric-item">
             <span class="metric-label">Total Deposits Value</span>
