@@ -175,7 +175,7 @@
       <div class="data-section">
         <p class="data-label">Available to Collateralize</p>
         <p class="data-value">
-          {{ selectedCustodied(depositCollateralForm.coin) }}
+          {{ selectedClaimable(depositCollateralForm.coin) }}
           {{ depositCollateralForm.coin }}
         </p>
       </div>
@@ -430,7 +430,7 @@
       <div class="data-section">
         <p class="data-label">Available to Withdraw</p>
         <p class="data-value">
-          {{ selectedVaultCollateral(withdrawCollateralForm.coin) }}
+          {{ selectedVaultCollateralAmount(withdrawCollateralForm.coin) }}
           {{ withdrawCollateralForm.coin }}
         </p>
       </div>
@@ -457,6 +457,7 @@ import {
 import { resolveAssetAddress } from "@/contracts/erc20";
 import { web3 } from "@/contracts/wallet";
 import { getBobPrice, getAlicePrice } from "@/contracts/oracle";
+import { getUserClaimableAssetAmount } from "@/contracts/lendingPool";
 
 export default {
   name: "BorrowActions",
@@ -493,13 +494,13 @@ export default {
         unit: "ether",
         submitting: false,
       },
-      custodiedAlice: "0",
-      custodiedBob: "0",
+      claimableAlice: "0",
+      claimableBob: "0",
       debtAlice: "0",
       debtBob: "0",
       vaultDataCache: {},
       assetNameMap: {},
-      calculatedAmount: "", // 添加这个属性
+      calculatedAmount: "",
     };
   },
   computed: {
@@ -540,8 +541,8 @@ export default {
       }
     },
 
-    selectedCustodied(coin) {
-      const raw = coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+    selectedClaimable(coin) {
+      const raw = coin === "Alice" ? this.claimableAlice : this.claimableBob;
       const value = parseFloat(this.formatWei(raw));
       // 向下取整到3位小数
       return Math.floor(value * 1000) / 1000;
@@ -579,12 +580,22 @@ export default {
         : this.selectedVaultData.collateralBobRaw;
     },
 
-    selectedVaultCollateral(coin) {
-      const value = parseFloat(
-        this.formatWei(this.selectedVaultCollateralRaw(coin)),
+    selectedVaultCollateralAmount(coin) {
+      if (!this.selectedVaultData || !this.selectedVaultData.collateralAssets) {
+        return "0.000";
+      }
+
+      // 从 collateralAssets 中查找对应资产
+      const asset = this.selectedVaultData.collateralAssets.find(
+        (a) => a.name === coin,
       );
-      // 向下取整到3位小数
-      return Math.floor(value * 1000) / 1000;
+
+      if (!asset) {
+        return "0.000";
+      }
+
+      // 返回已格式化的金额（已经是3位小数）
+      return asset.formattedAmount;
     },
 
     async refreshDebtVaultIds() {
@@ -606,14 +617,14 @@ export default {
         const bobAddr = resolveAssetAddress("Bob");
 
         const [aliceShares, bobShares] = await Promise.all([
-          getUserCustodiedAssetAmount(undefined, aliceAddr),
-          getUserCustodiedAssetAmount(undefined, bobAddr),
+          getUserClaimableAssetAmount(undefined, aliceAddr),
+          getUserClaimableAssetAmount(undefined, bobAddr),
         ]);
 
-        this.custodiedAlice = aliceShares;
-        this.custodiedBob = bobShares;
+        this.claimableAlice = aliceShares;
+        this.claimableBob = bobShares;
       } catch (err) {
-        console.error("Failed to refresh custodied shares:", err);
+        console.error("Failed to refresh claimable shares:", err);
       }
     },
 
@@ -778,16 +789,16 @@ export default {
         "Transaction failed";
 
       if (message.includes("insufficient collateral")) {
-        return "❌ Insufficient collateral. Please deposit and collateralize first.";
+        return "Insufficient collateral. Please deposit and collateralize first.";
       }
       if (message.includes("collateral disabled")) {
-        return "❌ Asset not configured as collateral. Check contract settings.";
+        return "Asset not configured as collateral. Check contract settings.";
       }
       if (message.includes("insufficient balance")) {
-        return "❌ Insufficient balance.";
+        return "Insufficient balance.";
       }
       if (message.includes("approval")) {
-        return "❌ Approval required.";
+        return "Approval required.";
       }
       return message;
     },
@@ -821,11 +832,11 @@ export default {
       }
 
       const available =
-        form.coin === "Alice" ? this.custodiedAlice : this.custodiedBob;
+        form.coin === "Alice" ? this.claimableAlice : this.claimableBob;
       const requestedWei = this.amountToWei(form.value, form.unit);
       if (BigInt(requestedWei) > BigInt(available || "0")) {
         ElMessage.warning(
-          `Insufficient available assets. Available: ${this.selectedCustodied(form.coin)} ${form.coin}`,
+          `Insufficient available assets. Available: ${this.selectedClaimable(form.coin)} ${form.coin}`,
         );
         return;
       }
@@ -933,12 +944,12 @@ export default {
 
       const availableRaw = this.selectedVaultCollateralRaw(form.coin);
       const requestedWei = this.amountToWei(form.value, form.unit);
-      if (BigInt(requestedWei) > BigInt(availableRaw || "0")) {
-        ElMessage.warning(
-          `Insufficient collateral. Available: ${this.selectedVaultCollateral(form.coin)} ${form.coin}`,
-        );
-        return;
-      }
+      // if (BigInt(requestedWei) > BigInt(availableRaw || "0")) {
+      //   ElMessage.warning(
+      //     `Insufficient collateral. Available: ${this.selectedVaultCollateralAmount(form.coin)} ${form.coin}`,
+      //   );
+      //   return;
+      // }
 
       form.submitting = true;
       try {

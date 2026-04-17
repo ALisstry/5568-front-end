@@ -69,6 +69,10 @@
   <el-button @click="getDebtVaultCollateralAssets1"
     >getDebtVaultCollateralAssets</el-button
   >
+  <el-divider />
+  <el-button @click="getPoolCoinbalance1">getPoolCoinbalance</el-button>
+  <el-button @click="getUnclaimedRewards1">getUnclaimedRewards</el-button>
+  <el-button @click="claimPoolCoin1">claimPoolCoin</el-button>
 </template>
 
 <script>
@@ -90,6 +94,11 @@ import {
 import Web3 from "web3";
 import { ElMessage } from "element-plus";
 import { getBobPrice, getAlicePrice, setPrice } from "@/contracts/oracle";
+import { getPoolCoinbalance } from "@/contracts/poolCoin";
+import {
+  claimPoolCoin,
+  getUnclaimedRewards,
+} from "@/contracts/poolIncentivesController";
 
 import CardItem from "@/components/CardItem.vue";
 export default {
@@ -183,6 +192,16 @@ export default {
 
     async getDebtVaultCollateralAssets1() {
       alert(await getDebtVaultCollateralAssets(3));
+    },
+
+    async getPoolCoinbalance1() {
+      alert(await getPoolCoinbalance());
+    },
+    async getUnclaimedRewards1() {
+      alert(await getUnclaimedRewards());
+    },
+    async claimPoolCoin1() {
+      alert(await claimPoolCoin());
     },
   },
   components: {
