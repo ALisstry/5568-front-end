@@ -567,10 +567,21 @@ export default {
     },
 
     selectedDebt(coin) {
-      const raw = coin === "Alice" ? this.debtAlice : this.debtBob;
-      const value = parseFloat(this.formatWei(raw));
-      // 向下取整到3位小数
-      return Math.floor(value * 1000) / 1000;
+      if (!this.selectedVaultData || !this.selectedVaultData.borrowedAssets) {
+        return "0.000";
+      }
+
+      // 从 borrowedAssets 中查找对应资产的债务
+      const asset = this.selectedVaultData.borrowedAssets.find(
+        (a) => a.name === coin,
+      );
+
+      if (!asset) {
+        return "0.000";
+      }
+
+      // 返回已格式化的金额（已经是3位小数）
+      return asset.formattedAmount;
     },
 
     selectedVaultCollateralRaw(coin) {
