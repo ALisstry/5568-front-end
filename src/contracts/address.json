@@ -11,5 +11,6 @@
   "FlashLoanBot": "0x4ed7c70f96b99c776995fb64377f0d4ab3b0e1c1",
   "PoolCoin": "0x322813fd9a801c5507c9de605d63cea4f2ce6c44",
   "PoolIncentivesController": "0xa85233c63b9ee964add6f2cffe00fd84eb32338f",
-  "FlashLoanPool": "0x68b1d87f95878fe05b998f19b66f4baba5de1aed"
+  "FlashLoanPool": "0x68b1d87f95878fe05b998f19b66f4baba5de1aed",
+  "FlashLoanSwap": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82"
 }

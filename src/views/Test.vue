@@ -74,6 +74,10 @@
   <el-button @click="getUnclaimedRewards1">getUnclaimedRewards</el-button>
   <el-button @click="claimPoolCoin1">claimPoolCoin</el-button>
   <el-button @click="getFlashLoanAsset1">getFlashLoanAsset</el-button>
+  <CardItem>
+    <el-input v-model="exchangeRate"></el-input>
+    <el-button @click="setExchangeRate1">setExchangeRate</el-button>
+  </CardItem>
 </template>
 
 <script>
@@ -102,6 +106,7 @@ import {
 } from "@/contracts/poolIncentivesController";
 
 import { getBalance as getFlashLoanAsset } from "@/contracts/flashLoanPool";
+import { setExchangeRate } from "@/contracts/flashLoanSwap";
 
 import CardItem from "@/components/CardItem.vue";
 export default {
@@ -114,6 +119,7 @@ export default {
       bobPrice: "1",
       alicePriceUnit: "ether",
       bobPriceUnit: "ether",
+      exchangeRate: "1.5",
     };
   },
   methods: {
@@ -209,6 +215,9 @@ export default {
 
     async getFlashLoanAsset1() {
       alert(await getFlashLoanAsset());
+    },
+    async setExchangeRate1() {
+      await setExchangeRate(this.exchangeRate);
     },
   },
   components: {
