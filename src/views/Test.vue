@@ -73,6 +73,7 @@
   <el-button @click="getPoolCoinbalance1">getPoolCoinbalance</el-button>
   <el-button @click="getUnclaimedRewards1">getUnclaimedRewards</el-button>
   <el-button @click="claimPoolCoin1">claimPoolCoin</el-button>
+  <el-button @click="getFlashLoanAsset1">getFlashLoanAsset</el-button>
 </template>
 
 <script>
@@ -99,6 +100,8 @@ import {
   claimPoolCoin,
   getUnclaimedRewards,
 } from "@/contracts/poolIncentivesController";
+
+import { getBalance as getFlashLoanAsset } from "@/contracts/flashLoanPool";
 
 import CardItem from "@/components/CardItem.vue";
 export default {
@@ -202,6 +205,10 @@ export default {
     },
     async claimPoolCoin1() {
       alert(await claimPoolCoin());
+    },
+
+    async getFlashLoanAsset1() {
+      alert(await getFlashLoanAsset());
     },
   },
   components: {
