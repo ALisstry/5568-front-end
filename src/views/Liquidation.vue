@@ -3,7 +3,12 @@
     <CardItem class="liquidation-card">
       <div class="card-header">
         <h3 class="card-title">Liquidatable DebtVaults</h3>
-        <el-button plain class="mini-btn" :loading="loading" @click="refreshTables">
+        <el-button
+          plain
+          class="mini-btn"
+          :loading="loading"
+          @click="refreshTables"
+        >
           Refresh
         </el-button>
       </div>
@@ -24,6 +29,34 @@
           <p class="row-sub">Health Factor: {{ row.healthFactor }}</p>
           <p class="row-sub">Debt Value: {{ row.debtValue }}</p>
           <p class="row-sub">Collateral Value: {{ row.collateralValue }}</p>
+
+          <div class="asset-group">
+            <p class="asset-title">Debts</p>
+            <p v-if="!row.borrowedAssets.length" class="row-sub">
+              No debt assets
+            </p>
+            <p
+              v-for="asset in row.borrowedAssets"
+              :key="`debt-${asset.address}`"
+              class="row-sub"
+            >
+              {{ asset.name }}: {{ asset.amount }} (Value: ${{ asset.value }})
+            </p>
+          </div>
+
+          <div class="asset-group">
+            <p class="asset-title">Collaterals</p>
+            <p v-if="!row.collateralAssets.length" class="row-sub">
+              No collateral assets
+            </p>
+            <p
+              v-for="asset in row.collateralAssets"
+              :key="`collateral-${asset.address}`"
+              class="row-sub"
+            >
+              {{ asset.name }}: {{ asset.amount }} (Value: ${{ asset.value }})
+            </p>
+          </div>
         </div>
         <el-button plain class="mini-btn" @click="openLiquidationDialog(row)">
           Liquidate
@@ -55,11 +88,43 @@
             <span class="info-label">Collateral Value</span>
             <span class="info-value">{{ dialog.collateralValue || "-" }}</span>
           </p>
+
+          <div class="info-assets">
+            <p class="asset-title">Debts</p>
+            <p v-if="!dialog.borrowedAssets.length" class="info-asset-line">
+              No debt assets
+            </p>
+            <p
+              v-for="asset in dialog.borrowedAssets"
+              :key="`dialog-debt-${asset.address}`"
+              class="info-asset-line"
+            >
+              {{ asset.name }}: {{ asset.amount }} (Value: ${{ asset.value }})
+            </p>
+          </div>
+
+          <div class="info-assets">
+            <p class="asset-title">Collaterals</p>
+            <p v-if="!dialog.collateralAssets.length" class="info-asset-line">
+              No collateral assets
+            </p>
+            <p
+              v-for="asset in dialog.collateralAssets"
+              :key="`dialog-collateral-${asset.address}`"
+              class="info-asset-line"
+            >
+              {{ asset.name }}: {{ asset.amount }} (Value: ${{ asset.value }})
+            </p>
+          </div>
         </div>
 
         <el-tabs v-model="tabMode" class="mode-tabs">
           <el-tab-pane label="Direct Liquidation" name="direct">
-            <el-form class="action-form" label-position="right" label-width="130px">
+            <el-form
+              class="action-form"
+              label-position="right"
+              label-width="130px"
+            >
               <el-form-item label="Debt Asset">
                 <el-select
                   v-model="direct.debtAsset"
@@ -140,7 +205,11 @@
           </el-tab-pane>
 
           <el-tab-pane label="Flash Liquidation" name="flash">
-            <el-form class="action-form" label-position="right" label-width="130px">
+            <el-form
+              class="action-form"
+              label-position="right"
+              label-width="130px"
+            >
               <el-form-item label="Debt Asset">
                 <el-select
                   v-model="flash.debtAsset"
@@ -233,6 +302,7 @@ import addressJson from "@/contracts/address.json" with { type: "json" };
 import { web3 } from "@/contracts/wallet";
 import { liquidate } from "@/contracts/lendingPool";
 import { flashLiquidate } from "@/contracts/flashLoanBot";
+import { getAlicePrice, getBobPrice } from "@/contracts/oracle";
 
 export default {
   name: "Liquidation",
@@ -252,6 +322,8 @@ export default {
         healthFactor: "",
         debtValue: "",
         collateralValue: "",
+        borrowedAssets: [],
+        collateralAssets: [],
       },
       direct: {
         debtAsset: "Alice",
@@ -286,6 +358,86 @@ export default {
       }
     },
 
+    formatDecimal(raw, digits) {
+      try {
+        const value = Number(this.formatWei(raw));
+        if (!Number.isFinite(value)) return "0";
+        return value.toFixed(digits);
+      } catch {
+        return "0";
+      }
+    },
+
+    getAssetName(address) {
+      if (!address) return "Unknown";
+      const lowerAddr = address.toLowerCase();
+      if (lowerAddr === addressJson.AliceToken.toLowerCase()) return "Alice";
+      if (lowerAddr === addressJson.BobToken.toLowerCase()) return "Bob";
+      return "Unknown";
+    },
+
+    getAssetPriceRaw(address, prices) {
+      if (!address) return "0";
+      const normalized = address.toLowerCase();
+      return prices[normalized] || "0";
+    },
+
+    toAssetValueRaw(amountRaw, priceRaw) {
+      try {
+        const amount = BigInt(String(amountRaw || "0"));
+        const price = BigInt(String(priceRaw || "0"));
+        return ((amount * price) / 1000000000000000000n).toString();
+      } catch {
+        return "0";
+      }
+    },
+
+    async buildAssetDetails({
+      lendingPool,
+      debtVaultId,
+      assetAddresses,
+      mode,
+      prices,
+    }) {
+      const details = await Promise.all(
+        (assetAddresses || []).map(async (assetAddress) => {
+          try {
+            const amountRaw =
+              mode === "collateral"
+                ? await lendingPool.methods
+                    .getDebtVaultCollateralAssetAmount(
+                      debtVaultId,
+                      assetAddress,
+                    )
+                    .call()
+                : await lendingPool.methods
+                    .getDebtVaultDebtAmount(debtVaultId, assetAddress)
+                    .call();
+            const priceRaw = this.getAssetPriceRaw(assetAddress, prices);
+            const valueRaw = this.toAssetValueRaw(amountRaw, priceRaw);
+            return {
+              address: String(assetAddress || ""),
+              name: this.getAssetName(assetAddress),
+              amountRaw: String(amountRaw || "0"),
+              valueRaw,
+              amount: this.formatDecimal(amountRaw, 3),
+              value: this.formatDecimal(valueRaw, 2),
+            };
+          } catch {
+            return {
+              address: String(assetAddress || ""),
+              name: this.getAssetName(assetAddress),
+              amountRaw: "0",
+              valueRaw: "0",
+              amount: "0.000",
+              value: "0.00",
+            };
+          }
+        }),
+      );
+      return details;
+    },
+
     async refreshTables() {
       this.loading = true;
       this.error = "";
@@ -294,14 +446,57 @@ export default {
           lendingPoolAbi,
           addressJson.LendingPool,
         );
-        const rows = await lendingPool.methods.getLiquidationTables().call();
-        this.liquidationTables = (rows || []).map((item) => ({
-          debtVaultId: String(item.debtVaultId || ""),
-          borrower: String(item.borrower || ""),
-          healthFactor: this.formatWei(item.healthFactor),
-          debtValue: this.formatWei(item.debtValue),
-          collateralValue: this.formatWei(item.collateralValue),
-        }));
+        const [rows, alicePriceRaw, bobPriceRaw] = await Promise.all([
+          lendingPool.methods.getLiquidationTables().call(),
+          getAlicePrice(),
+          getBobPrice(),
+        ]);
+        const prices = {
+          [addressJson.AliceToken.toLowerCase()]: String(alicePriceRaw || "0"),
+          [addressJson.BobToken.toLowerCase()]: String(bobPriceRaw || "0"),
+        };
+
+        this.liquidationTables = await Promise.all(
+          (rows || []).map(async (item) => {
+            const debtVaultId = String(item.debtVaultId || "");
+            const [collateralAssetAddresses, borrowedAssetAddresses] =
+              await Promise.all([
+                lendingPool.methods
+                  .getDebtVaultCollateralAssets(debtVaultId)
+                  .call(),
+                lendingPool.methods
+                  .getDebtVaultBorrowedAssets(debtVaultId)
+                  .call(),
+              ]);
+
+            const [collateralAssets, borrowedAssets] = await Promise.all([
+              this.buildAssetDetails({
+                lendingPool,
+                debtVaultId,
+                assetAddresses: collateralAssetAddresses,
+                mode: "collateral",
+                prices,
+              }),
+              this.buildAssetDetails({
+                lendingPool,
+                debtVaultId,
+                assetAddresses: borrowedAssetAddresses,
+                mode: "debt",
+                prices,
+              }),
+            ]);
+
+            return {
+              debtVaultId,
+              borrower: String(item.borrower || ""),
+              healthFactor: this.formatWei(item.healthFactor),
+              debtValue: this.formatWei(item.debtValue),
+              collateralValue: this.formatWei(item.collateralValue),
+              collateralAssets,
+              borrowedAssets,
+            };
+          }),
+        );
       } catch (err) {
         this.error = this.getErrorMessage(err);
       } finally {
@@ -317,6 +512,8 @@ export default {
         healthFactor: row.healthFactor,
         debtValue: row.debtValue,
         collateralValue: row.collateralValue,
+        borrowedAssets: row.borrowedAssets || [],
+        collateralAssets: row.collateralAssets || [],
       };
       this.tabMode = "direct";
       this.direct.amount = "";
@@ -471,6 +668,17 @@ export default {
   color: rgb(80, 80, 80);
 }
 
+.asset-group {
+  margin-top: 8px;
+}
+
+.asset-title {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(60, 60, 60);
+}
+
 .dialog-grid {
   display: grid;
   gap: 16px;
@@ -495,6 +703,15 @@ export default {
 .info-value {
   color: rgb(30, 30, 30);
   font-weight: 600;
+}
+
+.info-assets {
+  margin-top: 8px;
+}
+
+.info-asset-line {
+  margin: 0 0 4px 0;
+  color: rgb(80, 80, 80);
 }
 
 .mode-tabs {
@@ -534,6 +751,22 @@ export default {
 
 :deep(.el-select-dropdown__item.is-selected span) {
   color: black !important;
+}
+
+/* 下划线颜色 */
+:deep(.el-tabs__active-bar) {
+  background-color: black;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: black;
+  font-weight: bold;
+  opacity: 1;
+}
+
+:deep(.el-tabs__item:hover) {
+  color: black;
+  opacity: 1;
 }
 
 @media (max-width: 768px) {
